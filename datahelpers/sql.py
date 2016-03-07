@@ -66,7 +66,7 @@ def get_table(session=None, hostname=None, username=None,
               password=None, database='valentin', table='GeneWAys',
               query_dict=None):
     """
-    Paremeters
+    Parameters
     ----------
     :param session: string
         Session suffix identificator

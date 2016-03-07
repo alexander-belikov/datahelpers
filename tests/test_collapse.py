@@ -22,7 +22,6 @@ class TestCollapse(unittest.TestCase):
         s2 = pd.Series(self.data2)
 
         ret = dc.collapse_series_simple(s)
-        ret2 = dc.collapse_series_simple(s2)
         ddinv = ret[1]
         ret3 = dc.collapse_series_simple(s2, ddinv)
 
@@ -33,7 +32,6 @@ class TestCollapse(unittest.TestCase):
         df2 = pd.DataFrame(np.reshape(self.data2, (-1, 2)), columns=['c1', 'c2'])
 
         ret = dc.collapse_strings(df)
-        ret2 = dc.collapse_strings(df2)
         ddinv = ret[1]
         ret3 = dc.collapse_strings(df2, str_dicts=ddinv)
 
