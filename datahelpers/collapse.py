@@ -162,7 +162,8 @@ def create_renaming_dict(obj_list, existing_dict=None):
             dd = {list_extra[k]: (k+int_max) for k in
                   np.arange(len(list_extra))}
             dd.update(existing_dict)
-
+        else:
+            dd = existing_dict
     else:
         dd = {obj_list[k]: k for k in np.arange(len(obj_list))}
     return dd
@@ -170,7 +171,7 @@ def create_renaming_dict(obj_list, existing_dict=None):
 collapse = collapse_series_simple
 
 
-def collapse_strings(df_orig, n=None, str_dicts=None, verbose=False):
+def collapse_strings(df_orig, str_dicts=None, n=None, verbose=False):
     """
     encode DataFrame's constituent Series of objects into a Series of ints
     and provide the encoding dict of dicts

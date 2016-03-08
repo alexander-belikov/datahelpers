@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 def analyze_unique(df, column):
     dfr = df.drop_duplicates(df.columns)
     vc = dfr[column].value_counts()
