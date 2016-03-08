@@ -1,4 +1,5 @@
 import numpy as np
+import regular as reg
 from pandas import to_numeric, DataFrame
 
 
@@ -95,12 +96,13 @@ def collapse_series_sort(s):
     return dft['coded'], dd
 
 
-def collapse_series_simple(s, ddinv=None):
+def collapse_series_simple2(s, ddinv=None, apply_on_series=True):
     """
     encode Series s of objects into a Series of ints and provide the encoding dict
         dd format
         dd = {obj1 : int1, obj2 : int2}
         ddinv format
+    :param apply_on_series:
     :param s:
     :param ddinv: dict
         dict of inverse mapping
@@ -120,8 +122,50 @@ def collapse_series_simple(s, ddinv=None):
     else:
         dd = {ll[k]: k for k in np.arange(ll.shape[0])}
         ddinv = {dd[k]: k for k in dd.keys()}
-    s = s.apply(lambda x: dd[x])
+    if apply_on_series:
+        s = s.apply(lambda x: dd[x])
     return s, ddinv
+
+
+def collapse_series_simple(s, existing_dict=None, apply_on_series=True):
+    """
+    :param s: pd.Series
+    :param existing_dict: dict
+        example: {'a': 1, 'b': 1}
+    :param apply_on_series: boolean
+    :return: series, dict
+        - inverse transform is given by
+        ddinv = {dd[k]: k for k in dd.keys()}
+
+    """
+
+    ll = np.sort(s.unique())
+
+    dd = create_renaming_dict(ll, existing_dict)
+
+    if apply_on_series:
+        s = s.apply(lambda x: dd[x])
+    return s, dd
+
+
+def create_renaming_dict(obj_list, existing_dict=None):
+    """
+
+    :param obj_list:
+    :param existing_dict:
+    :return:
+    """
+    if existing_dict:
+        list_extra = sorted(list(set(obj_list) - set(existing_dict.keys())))
+        if list_extra:
+            int_max = max(existing_dict.values()) + 1
+            dd = {list_extra[k]: (k+int_max) for k in
+                  np.arange(len(list_extra))}
+            dd.update(existing_dict)
+
+    else:
+        dd = {obj_list[k]: k for k in np.arange(len(obj_list))}
+    return dd
 
 collapse = collapse_series_simple
 
@@ -155,6 +199,33 @@ def collapse_strings(df_orig, n=None, str_dicts=None, verbose=False):
     else:
         df, str_dicts = collapse(df)
     return df, str_dicts
+
+
+def regexp_reduce_yield_agg_dict(df, columns):
+    """
+
+    :param df:
+    :param columns:
+    :return:
+    """
+    agg_encoding_set = set()
+    agg_regexp_dict = {}
+    for c in columns:
+        uni_vals = df[c].unique()
+        keys_prime = map(reg.chain_regexp_transforms, uni_vals)
+        keys_prime_set = set(keys_prime)
+        keys_trans = set(uni_vals) - keys_prime_set
+        regexp_dict = {k: reg.chain_regexp_transforms(k) for k in keys_trans}
+    # mask of such entries that are regexp transformed
+        m = df[c].isin(keys_trans)
+        df.loc[m, c] = df.loc[m, c].apply(lambda x: regexp_dict[x])
+        agg_encoding_set |= keys_prime_set
+        agg_regexp_dict.update(regexp_dict)
+
+    agg_encoding_list = sorted(set(agg_encoding_set))
+    agg_encoding_dict = {agg_encoding_list[k]: k for k in np.arange(len(agg_encoding_list))}
+    return df, agg_encoding_dict, agg_regexp_dict
+
 
 # collapse simple seems to win
 # %time dft_sort, dd_sort = collapse_strings(df)

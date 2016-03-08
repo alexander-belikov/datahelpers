@@ -25,7 +25,7 @@ class TestCollapse(unittest.TestCase):
         ddinv = ret[1]
         ret3 = dc.collapse_series_simple(s2, ddinv)
 
-        self.assertEquals(set(ret3[1].values()), set(self.strings))
+        self.assertEquals(set(ret3[1].keys()), set(self.strings))
 
     def test_collapse_strings(self):
         df = pd.DataFrame(np.reshape(self.data, (-1, 2)), columns=['c1', 'c2'])
