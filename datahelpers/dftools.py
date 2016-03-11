@@ -16,18 +16,16 @@ def get_sni_mask(df, x, y):
     sni = surjective and non injective
     :param df:
     :param x:
-    :param y:
     :return:
     """
-    dfy = df.drop_duplicates(y)
-    unique_x = set(df[x].values)
-    dropped_x = unique_x - set(dfy[x].values)
-    sni_y = df[df[x].isin(dropped_x)].drop_duplicates(y)[y].unique()
-    sni_mask = df[y].isin(sni_y)
-    return sni_mask, sni_y
+
+    sni_mask = df.duplicated(y, keep=False)
+    sni_y = df.loc[sni_mask, y].unique()
+    sni_x = df.loc[sni_mask, x].unique()
+    return sni_mask, sni_y, sni_x
 
 
-def create_unique_index(df_init, columns, respect_axis=None):
+def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     """
     df has only two columns i1 and i2, there are only unique combinations (i1, i2)
     respect_axis can be None, 'first', 'second' or 'both'
@@ -35,39 +33,72 @@ def create_unique_index(df_init, columns, respect_axis=None):
 
     :param df_init:
     :param columns:
-    :param respect_axis:
+    :param sni_index:
+    :param ambiguous_index:
     :return:
     """
     df = df_init[columns].copy()
     c_derived = columns[0] + 'x' + columns[1]
-    pairs = []
-    if respect_axis == 'first':
-        pairs = [columns]
-    if respect_axis == 'second':
-        columns.reverse()
-        pairs = [columns]
-    if respect_axis == 'both':
-        columns_rev = list(columns)
-        columns_rev.reverse()
-        pairs = [columns, columns_rev]
+    x = columns[0]
+    y = columns[1]
+    z = 'z'
+    pairs = {x: y, y: x}
 
     masks = {}
-    ids = {}
-    for p in pairs:
-        masks[p[1]], ids[p[1]] = get_sni_mask(df, *p)
+    ids = {x: {}, y: {}, z: {}}
 
-    df[c_derived] = 0
+    for k in columns:
+        masks[k], ids[k][pairs[k]], ids[k][k] = get_sni_mask(df, k, pairs[k])
+
+    for k in columns:
+        ids[z][k] = list(set(ids[x][k]) & set(ids[y][k]))
+
+    mask_z = (df[x].isin(ids[z][x])) | (df[y].isin(ids[z][y]))
+
+    for k in masks.keys():
+        masks[k] &= ~mask_z
+
+    masks[z] = mask_z
+
     mask_biject = pd.Series([True]*df.shape[0], df.index)
 
     for k in masks.keys():
-        mask_biject ^= masks[k]
-    df.loc[mask_biject, c_derived] = range(0, sum(mask_biject))
-    current_index = sum(mask_biject)
+        mask_biject &= ~masks[k]
+
+    mask_biject &= ~mask_z
+
+    df[c_derived] = df[columns[0]]
+
+    df.loc[mask_biject, c_derived] = np.arange(0, np.sum(mask_biject))
+
+    current_index = np.sum(mask_biject)
 
     for k in masks.keys():
+        print k, sum(masks[k])
+    print sum(mask_biject)
+
+    for k in columns:
         m = masks[k]
-        index_dict = {k: v for (k, v) in zip(ids[k], range(current_index, current_index + len(ids[k])))}
-        df.loc[m, c_derived] = df.loc[m, k]
-        df.loc[m, c_derived] = df.loc[m, c_derived].apply(lambda x: index_dict[x])
-        current_index += len(ids[k])
+
+        if k in sni_index:
+            sni_ids = df.loc[masks[k], pairs[k]].unique()
+            number_uniques = len(sni_ids)
+            print k, np.sum(m), sni_ids, number_uniques
+            index_dict = {key: v for (key, v) in zip(sni_ids, np.arange(current_index, current_index + number_uniques))}
+            df.loc[m, c_derived] = df.loc[m, pairs[k]].apply(lambda arg: index_dict[arg])
+        else:
+            number_uniques = np.sum(m)
+            df.loc[m, c_derived] = np.arange(current_index, current_index + number_uniques)
+
+        current_index += number_uniques
+
+    if ambiguous_index and ambiguous_index in columns:
+        sni_ids = df.loc[mask_z, ambiguous_index].unique()
+        number_uniques = len(sni_ids)
+        index_dict = {key: v for (key, v) in zip(sni_ids, np.arange(current_index, current_index + number_uniques))}
+        df.loc[mask_z, c_derived] = df.loc[mask_z, ambiguous_index].apply(lambda arg: index_dict[arg])
+
+    else:
+        df = df.loc[~mask_z]
+
     return df_init.merge(df, on=columns, copy=False)

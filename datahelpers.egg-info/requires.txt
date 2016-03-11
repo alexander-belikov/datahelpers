@@ -1,3 +1,4 @@
 pymysql
 pandas
 setuptools
+PyWavelets

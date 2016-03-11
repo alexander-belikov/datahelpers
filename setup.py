@@ -12,14 +12,14 @@ def read(fname):
 
 
 setup(
-    name = "datahelpers",
-    version = "0.0.2",
-    author = "Alexander Belikov",
-    author_email = "abelikov@gmail.com",
-    description = ("tools to wrangle data"),
-    license = "BSD",
-    keywords = "data wrangle pandas mysql",
-    url = "http://packages.python.org/datahelpers",
+    name="datahelpers",
+    version="0.0.2",
+    author="Alexander Belikov",
+    author_email="abelikov@gmail.com",
+    description="tools to wrangle data",
+    license="BSD",
+    keywords="data wrangle pandas mysql",
+    url="git@github.com:alexander-belikov/datahelpers.git",
     packages=['datahelpers', 'tests'],
     long_description=read('README'),
     classifiers=[
@@ -28,6 +28,6 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     install_requires=[
-          'pymysql','pandas', 'setuptools'
+          'pymysql', 'pandas', 'setuptools', 'PyWavelets'
       ],
 )

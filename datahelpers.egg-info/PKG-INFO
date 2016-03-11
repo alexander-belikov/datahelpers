@@ -1,8 +1,8 @@
 Metadata-Version: 1.1
 Name: datahelpers
-Version: 0.0.1
+Version: 0.0.2
 Summary: tools to wrangle data
-Home-page: http://packages.python.org/datahelpers
+Home-page: git@github.com:alexander-belikov/datahelpers.git
 Author: Alexander Belikov
 Author-email: abelikov@gmail.com
 License: BSD
