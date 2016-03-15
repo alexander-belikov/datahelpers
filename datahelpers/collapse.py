@@ -3,7 +3,7 @@ import regular as reg
 from pandas import to_numeric, DataFrame
 
 
-def convert_to_bool(df, inplace=False):
+def convert_to_bool(df, inplace=False, working_columns=[], omit_columns=[]):
     """
     convert all possible columns of DataFrame to bool type
     :param df: DataFrame
@@ -18,9 +18,14 @@ def convert_to_bool(df, inplace=False):
     else:
         dft = df.copy()
 
-    for c in dft.columns:
-        if str('NULL') in dft[c].unique():
-            dft[c] = dft[c].replace({'NULL': np.nan})
+    cols = set(df.columns) - set(omit_columns)
+    if working_columns:
+        cols &= set(working_columns)
+    cols = list(cols)
+
+    for c in cols:
+        if 'NULL' in dft[c].unique():
+            dft[c] = dft[c].replace('NULL', np.nan)
         if len(dft[c].unique()) < 3:
             # perhaps something more sophisticated could be
             # implemented
@@ -29,7 +34,7 @@ def convert_to_bool(df, inplace=False):
     return dft
 
 
-def convert_to_numeric(df, inplace=False):
+def convert_to_numeric(df, inplace=False, working_columns=[], omit_columns=[]):
     """
     convert all possible columns of DataFrame to numeric type
     :param df: DataFrame
@@ -45,7 +50,13 @@ def convert_to_numeric(df, inplace=False):
         dft = df
     else:
         dft = df.copy()
-    for c in dft.columns:
+
+    cols = set(df.columns) - set(omit_columns)
+    if working_columns:
+        cols &= set(working_columns)
+    cols = list(cols)
+
+    for c in cols:
         dft[c] = to_numeric(dft[c], errors='ignore')
         try:
             s = dft[c].astype(int)
@@ -56,19 +67,21 @@ def convert_to_numeric(df, inplace=False):
     return dft
 
 
-def collapse_df(df, str_dicts=None):
+def collapse_df(df, str_dicts=None, working_columns=[], omit_columns=[]):
     """
     collapses DataFrame types column by column
     :param df: DataFrame
         df to transform
     :param str_dicts: dict
         dictionary of string conversion dictionaries corresponding to columns of df
+    :param omit_columns
     :return:
     """
+    # TODO insert datetime clause
 
-    df = convert_to_bool(df)
-    df = convert_to_numeric(df)
-    df, dds = collapse_strings(df, str_dicts)
+    df = convert_to_bool(df, False, working_columns, omit_columns)
+    df = convert_to_numeric(df, False, working_columns, omit_columns)
+    df, dds = collapse_strings(df, str_dicts, working_columns, omit_columns)
     return df, dds
 
 
@@ -171,12 +184,14 @@ def create_renaming_dict(obj_list, existing_dict=None):
 collapse = collapse_series_simple
 
 
-def collapse_strings(df_orig, str_dicts=None, n=None, verbose=False):
+def collapse_strings(df_orig, str_dicts=None, working_columns=[],
+                     omit_columns=[], n=None, verbose=False):
     """
     encode DataFrame's constituent Series of objects into a Series of ints
     and provide the encoding dict of dicts
 
     :param df_orig:
+    :param omit_columns:
     :param n: integer
         take n top rows of df_orig
     :param str_dicts: dict of dicts
@@ -189,9 +204,19 @@ def collapse_strings(df_orig, str_dicts=None, n=None, verbose=False):
     df = df_orig.head(n).copy()
     if not str_dicts:
         str_dicts = {}
+
+    cols = set(df.columns) - set(omit_columns)
+    if working_columns:
+        cols &= set(working_columns)
+    cols = list(cols)
+
     if isinstance(df, DataFrame):
-        for c in df.columns:
+        for c in cols:
             if df[c].dtype == np.dtype('O'):
+                try:
+                    df[c] = df[c].astype(str)
+                except UnicodeEncodeError:
+                    df[c] = df[c].astype('unicode')
                 if verbose:
                     print 'process column', c
                 if c not in str_dicts.keys():

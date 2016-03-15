@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import datahelpers.collapse as dc
+from constants import protein_cols, triplet_index_cols
 
 
 def analyze_unique(df, column):
@@ -73,9 +75,9 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
 
     current_index = np.sum(mask_biject)
 
-    for k in masks.keys():
-        print k, sum(masks[k])
-    print sum(mask_biject)
+    # for k in masks.keys():
+    #     print k, sum(masks[k])
+    # print sum(mask_biject)
 
     for k in columns:
         m = masks[k]
@@ -83,7 +85,7 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
         if k in sni_index:
             sni_ids = df.loc[masks[k], pairs[k]].unique()
             number_uniques = len(sni_ids)
-            print k, np.sum(m), sni_ids, number_uniques
+            # print k, np.sum(m), sni_ids, number_uniques
             index_dict = {key: v for (key, v) in zip(sni_ids, np.arange(current_index, current_index + number_uniques))}
             df.loc[m, c_derived] = df.loc[m, pairs[k]].apply(lambda arg: index_dict[arg])
         else:
@@ -102,3 +104,36 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
         df = df.loc[~mask_z]
 
     return df_init.merge(df, on=columns, copy=False)
+
+
+def process_df_index(dft0, regexp_columns=protein_cols, index_cols=triplet_index_cols, collapse_df=True):
+    """
+
+    :param dft0:
+    :param regexp_columns:
+    :param index_cols:
+    :param collapse_df:
+    :return:
+    """
+    df = dft0.copy()
+    df, dd, dd_regexp = dc.regexp_reduce_yield_agg_dict(df, regexp_columns)
+    df_dd = {}
+
+    if collapse_df:
+        for c in protein_cols:
+            df_dd[c] = dd
+        df, dd2 = dc.collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
+
+    # get df with unique t = (t1, t2, t3) and i_h
+    dfw = df[index_cols + ['hiid']].drop_duplicates(index_cols + ['hiid'])
+    # get df with unique t = (t1, t2, t3)
+    dfw2 = dfw[index_cols].drop_duplicates(index_cols)
+    # create proxy integer triplet integer i_t <-> t
+    dfw3 = dfw2.set_index(index_cols).reset_index()
+    dfw4 = dfw3.reset_index().rename(columns={'index': 'i_t'})
+    # merge back i_t into df with unique t = (t1, t2, t3) and i_h
+    dfw5 = pd.merge(dfw, dfw4, on=index_cols, how='left')
+    # create a unique index across i_t and i_h
+    dfw6 = create_unique_index(dfw5, ['hiid', 'i_t'], ['i_t'])
+    df2 = pd.merge(df, dfw6, on=index_cols + ['hiid'], how='left')
+    return df2, dd2
