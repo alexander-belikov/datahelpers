@@ -75,10 +75,6 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
 
     current_index = np.sum(mask_biject)
 
-    # for k in masks.keys():
-    #     print k, sum(masks[k])
-    # print sum(mask_biject)
-
     for k in columns:
         m = masks[k]
 
@@ -137,3 +133,28 @@ def process_df_index(dft0, regexp_columns=protein_cols, index_cols=triplet_index
     dfw6 = create_unique_index(dfw5, ['hiid', 'i_t'], ['i_t'])
     df2 = pd.merge(df, dfw6, on=index_cols + ['hiid'], how='left')
     return df2, dd2
+
+
+def compute_centralities(df, node_cols, edge_type, extra_attr):
+    """
+
+    :param df:
+    :param node_cols:
+    :param edge_type:
+    :param extra_attr:
+    :return:
+    """
+    dict_keys = {'uni_nodes': node_cols,
+                 'uni_nodes_edge': node_cols+edge_type,
+                 'uni_nodes_edge_extra': node_cols+edge_type+extra_attr}
+
+    dict_dfs = {}
+    for k in dict_keys.keys():
+        dict_dfs[k] = df[dict_keys[k]].drop_duplicates(dict_keys[k])
+
+    for d in node_cols:
+        for k in dict_dfs.keys():
+            dft = dict_dfs[k].groupby(d).apply(lambda x: x.shape[0]).sort_values()
+            dft = dft.rename('centr_' + d + '_' + k)
+            df = pd.merge(df, pd.DataFrame(dft), how='left', left_on=d, right_index=True)
+    return df
