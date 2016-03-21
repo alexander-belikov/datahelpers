@@ -4,12 +4,6 @@ from constants import ye
 
 
 def plot_hist_true_false(dft, fname=None):
-    """
-
-    :param dft:
-    :param fname:
-    :return:
-    """
 
     data = dft[ye]
     min_data = min(data)
@@ -41,11 +35,43 @@ def plot_hist_true_false(dft, fname=None):
         plt.savefig(fname)
 
 
-def plot_hist(arr_list, ymax=None, fname=None):
+def plot_hist_float_x(data, xranges, yranges=None, N=10, opacity=0.8, ylog_axis=False, fname=None):
+    """
+
+    :param data:
+    :param xranges:
+    :param N:
+    :param opacity:
+    :param ylog_axis:
+    :param fname:
+    :return:
+    """
+
+    fig = plt.figure(figsize=(6, 6))
+    rect = [0.15, 0.12, 0.8, 0.8]
+    ax = fig.add_axes(rect)
+    if ylog_axis:
+        ax.set_yscale('log')
+    plt.xlim(xranges)
+    if yranges:
+        plt.ylim(yranges)
+
+    ll = plt.hist(data, bins=np.linspace(xranges[0], xranges[1], N+1), alpha=opacity)
+    if fname:
+        plt.savefig(fname)
+    return ll
+
+
+def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
+              xticks_factor=1, opacity=0.5, fname=None):
     """
 
     :param arr_list:
-    :param ymax:
+    :param approx_nbins:
+    :param yrange:
+    :param ylog_axis:
+    :param xticks_factor:
+    :param opacity:
     :param fname:
     :return:
     """
@@ -58,21 +84,22 @@ def plot_hist(arr_list, ymax=None, fname=None):
     min_data = min(mins)
     max_data = max(maxs)
 
-    N = 10
-
-    delta_x = max(int((max_data - min_data)/N), 1)
-    print min_data, max_data, delta_x
+    delta_x = max(int((max_data - min_data)/approx_nbins), 1)
     x_bins = np.arange(min_data, max_data + 2*delta_x, delta_x)
     x_ticks = np.arange(min_data-delta_x, max_data + 3*delta_x, delta_x)
+    x_ticks = x_ticks[::xticks_factor]
     x_labels = [str(int(t)) for t in x_ticks]
 
-    xranges = [min_data, max_data]
-    plt.xlim(xranges)
-    if not ymax:
-        ymax = max([d.shape[0] for d in arr_list])
-    plt.ylim([0, ymax])
+    xrange = [min_data, max_data]
+    plt.xlim(xrange)
 
-    opacity = 0.3
+    if not yrange:
+        yrange = [1e0, max([d.shape[0] for d in arr_list])]
+    plt.ylim(yrange)
+
+    if ylog_axis:
+        ax.set_yscale('log')
+
     plt.xticks(x_ticks, x_labels)
     for arr in arr_list:
         ll = plt.hist(arr, bins=x_bins,

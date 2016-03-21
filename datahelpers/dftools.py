@@ -148,6 +148,12 @@ def compute_centralities(df, node_cols, edge_type, extra_attr):
                  'uni_nodes_edge': node_cols+edge_type,
                  'uni_nodes_edge_extra': node_cols+edge_type+extra_attr}
 
+    # uni_nodes - number of connections a -> b for a give 'a' over diff 'b'
+    # uni_nodes_edge - number of connection a->c->b, where c is the type of edge
+    # for a give 'a' over different 'b' and 'c'
+    # uni_nodes_edge - number of connection a->c->b (e), where c is the type of edge
+    # for a give 'a' over different 'b' and 'c' and 'e'
+
     dict_dfs = {}
     for k in dict_keys.keys():
         dict_dfs[k] = df[dict_keys[k]].drop_duplicates(dict_keys[k])
