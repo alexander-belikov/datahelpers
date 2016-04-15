@@ -29,16 +29,27 @@ def get_sni_mask(df, x, y):
 
 def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     """
-    df has only two columns i1 and i2, there are only unique combinations (i1, i2)
-    respect_axis can be None, 'first', 'second' or 'both'
-    axis from respect_axis is tested for surjective and non injective and the image index is assigned
+    df_init has two columns = [i1, i2]
+    a super-index is derived based on
+    surjective and non injective maps (sni)
+    i1 and i2 are tested for sni map
+    i1 key means will stand for i1->i2 map
 
-    :param df_init:
-    :param columns:
-    :param sni_index:
-    :param ambiguous_index:
+    any df is split into bijective part, sni_i1, sni_i2 and an ambiguous parts
+
+    if i1 is in sni_index, then the super-index will only index unique i2
+    in the sni_i1 subset of df
+
+    e.g. if ambiguous is i1 then the indexing in the ambiguous part is done by i1
+    if ambiguous is None the ambiguous part is just dropped
+
+    :param df_init: DataFrame
+    :param columns: is pair [i1, i2] from the columns of df_init
+    :param sni_index: a subset of columns
+    :param ambiguous_index: i1, i2 or None
     :return:
     """
+
     df = df_init[columns].copy()
     c_derived = columns[0] + 'x' + columns[1]
     x = columns[0]
@@ -67,8 +78,6 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     for k in masks.keys():
         mask_biject &= ~masks[k]
 
-    mask_biject &= ~mask_z
-
     df[c_derived] = df[columns[0]]
 
     df.loc[mask_biject, c_derived] = np.arange(0, np.sum(mask_biject))
@@ -81,8 +90,9 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
         if k in sni_index:
             sni_ids = df.loc[masks[k], pairs[k]].unique()
             number_uniques = len(sni_ids)
-            # print k, np.sum(m), sni_ids, number_uniques
-            index_dict = {key: v for (key, v) in zip(sni_ids, np.arange(current_index, current_index + number_uniques))}
+            index_dict = {key: v
+                          for (key, v) in zip(sni_ids,
+                                              np.arange(current_index, current_index + number_uniques))}
             df.loc[m, c_derived] = df.loc[m, pairs[k]].apply(lambda arg: index_dict[arg])
         else:
             number_uniques = np.sum(m)
@@ -99,18 +109,22 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     else:
         df = df.loc[~mask_z]
 
-    return df_init.merge(df, on=columns, copy=False)
+    # dfr = df_init.merge(df, on=columns, how='left', copy=False)
+    dfr = df_init.merge(df, on=columns, copy=False)
+
+    return dfr
 
 
 def process_df_index(dft0, regexp_columns=protein_cols, index_cols=triplet_index_cols, collapse_df=True):
     """
-
+    the default behaviour is to throw away
     :param dft0:
     :param regexp_columns:
     :param index_cols:
     :param collapse_df:
     :return:
     """
+    # reduce columns using regular expressions, e.g.
     df = dft0.copy()
     df, dd, dd_regexp = dc.regexp_reduce_yield_agg_dict(df, regexp_columns)
     df_dd = {}
@@ -130,8 +144,9 @@ def process_df_index(dft0, regexp_columns=protein_cols, index_cols=triplet_index
     # merge back i_t into df with unique t = (t1, t2, t3) and i_h
     dfw5 = pd.merge(dfw, dfw4, on=index_cols, how='left')
     # create a unique index across i_t and i_h
+    # in case there is an ambiguity - prefer 'hiid'
     dfw6 = create_unique_index(dfw5, ['hiid', 'i_t'], ['i_t'])
-    df2 = pd.merge(df, dfw6, on=index_cols + ['hiid'], how='left')
+    df2 = pd.merge(df, dfw6, on=index_cols + ['hiid'], how='inner')
     return df2, dd2
 
 

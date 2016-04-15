@@ -24,7 +24,7 @@ def convert_to_bool(df, inplace=False, working_columns=[], omit_columns=[]):
     cols = list(cols)
 
     for c in cols:
-        if 'NULL' in dft[c].unique():
+        if any('NULL' == x for x in dft[c].unique()):
             dft[c] = dft[c].replace('NULL', np.nan)
         if len(dft[c].unique()) < 3:
             # perhaps something more sophisticated could be
