@@ -260,3 +260,85 @@ def regexp_reduce_yield_agg_dict(df, columns):
 # Wall time: 2.81 s
 # CPU times: user 988 ms, sys: 32.8 ms, total: 1.02 s
 # Wall time: 1.02 s
+
+
+def recast_series_input_dict_conversion_dict(s, idict, cdict):
+    """
+
+    :param s: Series to recast
+    :param idict: input
+    :param cdict: conversion dictionary
+    :return:
+    """
+
+    int_ilist = {cdict[k] for k in idict.keys()}
+    s2 = s.copy()
+    mask = s.isin(int_ilist)
+    uni_vals = list(set(idict.values()))
+    new_cdict = {uni_vals[i]: i for i in range(len(uni_vals))}
+    mdict = {cdict[k]: new_cdict[idict[k]] for k in idict.keys()}
+
+    s2.loc[mask] = s.loc[mask].apply(lambda x: mdict[x])
+    s2.loc[~mask] = np.nan
+    return s2, new_cdict
+
+
+def invert_dict_of_list(dd):
+    """
+    it is implied that the values in the lists are unique
+    :param dd:
+    :return:
+    """
+
+    inv_dd = {}
+    dts = [{v: k for v in dd[k]} for k in dd.keys()]
+    [inv_dd.update(x) for x in dts]
+    return inv_dd
+
+
+def aggregate_negatives_boolean_style(dfi, up, dn, at, ng):
+    """
+    say we have a and b and the effect is either positive (1)
+    or negative (0), and the claim can be no (1) or yes (0)
+
+    then in boolean approximation (negative, no) = (positive, yes)
+    then in boolean approximation (negative, yes) = (positive, no)
+
+    the first part is to identify for which pairs
+    there are both actiontypes in the DataFrame df
+
+
+    up  dn  at  ng
+
+    gA  gB  eff cl
+    a   b   0   0
+    a   b   0   1
+    a   b   1   0
+    a   b   1   1
+
+    :param dfi:
+    :param up:
+    :param dn:
+    :param at:
+    :return:
+    """
+    dfi.reset_index(inplace=True)
+    updnat_dups = dfi[[up, dn, at]].drop_duplicates([up, dn, at])
+    updn_degenerate = updnat_dups.loc[updnat_dups.duplicated([up, dn]), [up, dn]]
+    updn_degenerate[at] = 0
+    updn_degenerate['flag'] = True
+
+    # TODO : publish bug pd.DataFrame.merge does not keep the original index
+
+    mask = dfi[[up, dn, at]].merge(updn_degenerate, how='left', on=[up, dn, at])
+
+    mask.loc[mask['flag'].isnull(), 'flag'] = False
+    mask_neg_dups_at = mask['flag']
+
+    mask_neg_no = mask_neg_dups_at & (dfi[ng] == 1)
+    mask_neg_yes = mask_neg_dups_at & (dfi[ng] == 0)
+    dfi.loc[mask_neg_dups_at, at] = 1
+    dfi.loc[mask_neg_no, ng] = 0
+    dfi.loc[mask_neg_yes, ng] = 1
+
+    return dfi

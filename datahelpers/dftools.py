@@ -109,33 +109,26 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     else:
         df = df.loc[~mask_z]
 
+    df[c_derived] = df[c_derived].astype(np.int64)
+
     # dfr = df_init.merge(df, on=columns, how='left', copy=False)
     dfr = df_init.merge(df, on=columns, copy=False)
 
     return dfr
 
 
-def process_df_index(dft0, regexp_columns=protein_cols, index_cols=triplet_index_cols, collapse_df=True):
+def process_df_index(dft0, index_cols=triplet_index_cols,
+                     prefer_triplet=False):
     """
     the default behaviour is to throw away
     :param dft0:
-    :param regexp_columns:
     :param index_cols:
-    :param collapse_df:
+    :param prefer_triplet
     :return:
     """
-    # reduce columns using regular expressions, e.g.
-    df = dft0.copy()
-    df, dd, dd_regexp = dc.regexp_reduce_yield_agg_dict(df, regexp_columns)
-    df_dd = {}
-
-    if collapse_df:
-        for c in protein_cols:
-            df_dd[c] = dd
-        df, dd2 = dc.collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
 
     # get df with unique t = (t1, t2, t3) and i_h
-    dfw = df[index_cols + ['hiid']].drop_duplicates(index_cols + ['hiid'])
+    dfw = dft0[index_cols + ['hiid']].drop_duplicates(index_cols + ['hiid'])
     # get df with unique t = (t1, t2, t3)
     dfw2 = dfw[index_cols].drop_duplicates(index_cols)
     # create proxy integer triplet integer i_t <-> t
@@ -145,9 +138,33 @@ def process_df_index(dft0, regexp_columns=protein_cols, index_cols=triplet_index
     dfw5 = pd.merge(dfw, dfw4, on=index_cols, how='left')
     # create a unique index across i_t and i_h
     # in case there is an ambiguity - prefer 'hiid'
-    dfw6 = create_unique_index(dfw5, ['hiid', 'i_t'], ['i_t'])
-    df2 = pd.merge(df, dfw6, on=index_cols + ['hiid'], how='inner')
-    return df2, dd2
+    if prefer_triplet:
+        ll = ['hiid']
+    else:
+        ll = ['i_t']
+    dfw6 = create_unique_index(dfw5, ['hiid', 'i_t'], ll)
+    df2 = pd.merge(dft0, dfw6, on=index_cols + ['hiid'], how='inner')
+    return df2
+
+
+def regexp_collapse_protein_cols(dft0, collapse_df=True, regexp_columns=protein_cols):
+    """
+
+    :param dft0: initial DataFrame
+    :param collapse_df: flag - transform object (str) to int
+    :param regexp_columns: columns to reduce using regular expressions
+    :return:
+    """
+
+    df = dft0.copy()
+    df, dd, dd_regexp = dc.regexp_reduce_yield_agg_dict(df, regexp_columns)
+    df_dd = {}
+
+    if collapse_df:
+        for c in protein_cols:
+            df_dd[c] = dd
+        df, dd2 = dc.collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
+    return df, dd2
 
 
 def compute_centralities(df, node_cols, edge_type, extra_attr):
@@ -179,3 +196,7 @@ def compute_centralities(df, node_cols, edge_type, extra_attr):
             dft = dft.rename('centr_' + d + '_' + k)
             df = pd.merge(df, pd.DataFrame(dft), how='left', left_on=d, right_index=True)
     return df
+
+
+def XOR(s1, s2):
+    return ~(s1 | s2) | (s1 & s2)
