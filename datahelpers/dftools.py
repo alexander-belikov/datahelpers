@@ -163,8 +163,8 @@ def regexp_collapse_protein_cols(dft0, collapse_df=True, regexp_columns=protein_
     if collapse_df:
         for c in protein_cols:
             df_dd[c] = dd
-        df, dd2 = dc.collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
-    return df, dd2
+        df, dd_dd = dc.collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
+    return df, df_dd
 
 
 def compute_centralities(df, node_cols, edge_type, extra_attr):

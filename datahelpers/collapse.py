@@ -1,6 +1,43 @@
 import numpy as np
 import regular as reg
-from pandas import to_numeric, DataFrame
+from pandas import to_numeric, DataFrame, Series
+from constants import na_names
+
+
+def convert_NAs_Series(obj):
+    """
+
+    :param obj:
+    :param inplace:
+    :return:
+    """
+    if isinstance(obj, Series):
+
+        na_present = list(set(obj.unique()) & set(na_names))
+        #TODO use reduce
+        for word in na_present:
+            obj = obj.replace(word, np.nan)
+
+        return obj
+
+
+def convert_NAs_DataFrame(obj, dropNAs=True, working_columns=[]):
+    """
+
+    :param obj:
+    :param inplace:
+    :param dropNAs:
+    :param working_columns:
+    :return:
+    """
+
+    if isinstance(obj, DataFrame):
+        for c in working_columns:
+            # TODO clean inplace redundancy, see pandas
+            obj[c] = convert_NAs_Series(obj[c])
+        if dropNAs:
+            obj = obj.dropna(axis=0, how='any', subset=working_columns)
+        return obj
 
 
 def convert_to_bool(df, inplace=False, working_columns=[], omit_columns=[]):
@@ -24,8 +61,6 @@ def convert_to_bool(df, inplace=False, working_columns=[], omit_columns=[]):
     cols = list(cols)
 
     for c in cols:
-        if any('NULL' == x for x in dft[c].unique()):
-            dft[c] = dft[c].replace('NULL', np.nan)
         if len(dft[c].unique()) < 3:
             # perhaps something more sophisticated could be
             # implemented
@@ -67,18 +102,20 @@ def convert_to_numeric(df, inplace=False, working_columns=[], omit_columns=[]):
     return dft
 
 
-def collapse_df(df, str_dicts=None, working_columns=[], omit_columns=[]):
+def collapse_df(df, str_dicts=None, working_columns=[], omit_columns=[], dropna_columns=[]):
     """
     collapses DataFrame types column by column
     :param df: DataFrame
         df to transform
     :param str_dicts: dict
         dictionary of string conversion dictionaries corresponding to columns of df
+    :param working_columns
     :param omit_columns
+    :param dropna_columns
     :return:
     """
     # TODO insert datetime clause
-
+    df = convert_NAs_DataFrame(df, dropna_columns)
     df = convert_to_bool(df, False, working_columns, omit_columns)
     df = convert_to_numeric(df, False, working_columns, omit_columns)
     df, dds = collapse_strings(df, str_dicts, working_columns, omit_columns)
@@ -285,7 +322,7 @@ def recast_series_input_dict_conversion_dict(s, idict, cdict):
 
 def invert_dict_of_list(dd):
     """
-    it is implied that the values in the lists are unique
+    it is implied that the values in the lists are unique;
     :param dd:
     :return:
     """
