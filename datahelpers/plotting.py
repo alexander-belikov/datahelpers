@@ -3,12 +3,12 @@ import numpy as np
 from constants import ye
 
 
-def plot_hist_true_false(dft, fname=None):
+def plot_hist_true_false(dft, fname=None, column_name='negative'):
 
     data = dft[ye]
     min_data = min(data)
     max_data = max(data)
-    m = (dft['negative'] == False)
+    m = (dft[column_name] == False)
     data_pos = dft.loc[m, ye]
     data_neg = dft.loc[~m, ye]
 

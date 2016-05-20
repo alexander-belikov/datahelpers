@@ -33,9 +33,9 @@ class TestCollapse(unittest.TestCase):
         df = pd.DataFrame(np.reshape(self.data, (-1, 2)), columns=self.cols)
         df2 = pd.DataFrame(np.reshape(self.data2, (-1, 2)), columns=self.cols)
 
-        ret = dc.collapse_strings(df)
+        ret = dc.collapse_strings(df, working_columns=df.columns)
         ddinv = ret[1]
-        ret3 = dc.collapse_strings(df2, str_dicts=ddinv)
+        ret3 = dc.collapse_strings(df2, str_dicts=ddinv, working_columns=df2.columns)
 
         self.assertEquals(ret3[1], ret[1])
 

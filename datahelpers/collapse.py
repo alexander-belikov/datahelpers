@@ -21,7 +21,7 @@ def convert_NAs_Series(obj):
         return obj
 
 
-def convert_NAs_DataFrame(obj, dropNAs=True, working_columns=[]):
+def convert_NAs_DataFrame(obj, working_columns=[], dropNAs=True):
     """
 
     :param obj:
@@ -31,16 +31,17 @@ def convert_NAs_DataFrame(obj, dropNAs=True, working_columns=[]):
     :return:
     """
 
+    cols = list(set(working_columns) & set(obj.columns))
     if isinstance(obj, DataFrame):
-        for c in working_columns:
+        for c in cols:
             # TODO clean inplace redundancy, see pandas
             obj[c] = convert_NAs_Series(obj[c])
         if dropNAs:
-            obj = obj.dropna(axis=0, how='any', subset=working_columns)
+            obj = obj.dropna(axis=0, how='any', subset=cols)
         return obj
 
 
-def convert_to_bool(df, inplace=False, working_columns=[], omit_columns=[]):
+def convert_to_bool(df, working_columns=[], inplace=False):
     """
     convert all possible columns of DataFrame to bool type
     :param df: DataFrame
@@ -55,10 +56,7 @@ def convert_to_bool(df, inplace=False, working_columns=[], omit_columns=[]):
     else:
         dft = df.copy()
 
-    cols = set(df.columns) - set(omit_columns)
-    if working_columns:
-        cols &= set(working_columns)
-    cols = list(cols)
+    cols = list(set(working_columns) & set(df.columns))
 
     for c in cols:
         if len(dft[c].unique()) < 3:
@@ -69,7 +67,7 @@ def convert_to_bool(df, inplace=False, working_columns=[], omit_columns=[]):
     return dft
 
 
-def convert_to_numeric(df, inplace=False, working_columns=[], omit_columns=[]):
+def convert_to_numeric(df, working_columns=[], inplace=False):
     """
     convert all possible columns of DataFrame to numeric type
     :param df: DataFrame
@@ -86,10 +84,7 @@ def convert_to_numeric(df, inplace=False, working_columns=[], omit_columns=[]):
     else:
         dft = df.copy()
 
-    cols = set(df.columns) - set(omit_columns)
-    if working_columns:
-        cols &= set(working_columns)
-    cols = list(cols)
+    cols = list(set(working_columns) & set(df.columns))
 
     for c in cols:
         dft[c] = to_numeric(dft[c], errors='ignore')
@@ -102,7 +97,8 @@ def convert_to_numeric(df, inplace=False, working_columns=[], omit_columns=[]):
     return dft
 
 
-def collapse_df(df, str_dicts=None, working_columns=[], omit_columns=[], dropna_columns=[]):
+def collapse_df(df, str_dicts=None, dropna_columns=[], bool_columns=[],
+                numeric_columns=[], object_columns=[]):
     """
     collapses DataFrame types column by column
     :param df: DataFrame
@@ -116,9 +112,9 @@ def collapse_df(df, str_dicts=None, working_columns=[], omit_columns=[], dropna_
     """
     # TODO insert datetime clause
     df = convert_NAs_DataFrame(df, dropna_columns)
-    df = convert_to_bool(df, False, working_columns, omit_columns)
-    df = convert_to_numeric(df, False, working_columns, omit_columns)
-    df, dds = collapse_strings(df, str_dicts, working_columns, omit_columns)
+    df = convert_to_bool(df, bool_columns)
+    df = convert_to_numeric(df, numeric_columns)
+    df, dds = collapse_strings(df, str_dicts, object_columns)
     return df, dds
 
 
@@ -222,7 +218,7 @@ collapse = collapse_series_simple
 
 
 def collapse_strings(df_orig, str_dicts=None, working_columns=[],
-                     omit_columns=[], n=None, verbose=False):
+                     n=None, verbose=False):
     """
     encode DataFrame's constituent Series of objects into a Series of ints
     and provide the encoding dict of dicts
@@ -242,10 +238,7 @@ def collapse_strings(df_orig, str_dicts=None, working_columns=[],
     if not str_dicts:
         str_dicts = {}
 
-    cols = set(df.columns) - set(omit_columns)
-    if working_columns:
-        cols &= set(working_columns)
-    cols = list(cols)
+    cols = list(set(working_columns) & set(df.columns))
 
     if isinstance(df, DataFrame):
         for c in cols:

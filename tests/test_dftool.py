@@ -4,7 +4,7 @@ import unittest
 
 
 class TestDFTolls(unittest.TestCase):
-
+    #TODO fix the test
     def test_create_unique_index(self):
 
         df0 = pd.DataFrame({'i1': [0, 1, 2, 2, 2, 3, 4, 5, 5],
