@@ -17,7 +17,26 @@ class TestCollapse(unittest.TestCase):
     data2 = [strings[j] for j in inds2]
     data3 = np.array([strings_NAs, strings_NAs[::-1]])
 
-    cols = ['c1', 'c2']
+    c1, c2 = 'c1', 'c2'
+    index_cols = [c1, c2]
+
+    N2 = 10
+    at = 'action'
+    st = 'claim'
+    cols_total = [c1, c2, at, st]
+    keys = ['a', 'b']
+    vals = [[True, True], [True, False], [False, True],  [False, False]]
+    s = np.array(keys)
+
+    index_c = np.tile(s, (N2, 1))
+    tt = np.tile(vals[0], (2, 1))
+    ft = np.tile(vals[1], (2, 1))
+    tf = np.tile(vals[2], (2, 1))
+    ff = np.tile(vals[3], (4, 1))
+    data_bool = np.vstack([tt, ft, tf, ff])
+    dfa = pd.DataFrame(index_c, columns=index_cols)
+    dfb = pd.DataFrame(data_bool, columns=[at, st])
+    df = pd.concat([dfa, dfb], axis=1)
 
     def test_collapse_series_simple(self):
         s = pd.Series(self.data)
@@ -30,8 +49,8 @@ class TestCollapse(unittest.TestCase):
         self.assertEquals(set(ret3[1].keys()), set(self.strings))
 
     def test_collapse_strings(self):
-        df = pd.DataFrame(np.reshape(self.data, (-1, 2)), columns=self.cols)
-        df2 = pd.DataFrame(np.reshape(self.data2, (-1, 2)), columns=self.cols)
+        df = pd.DataFrame(np.reshape(self.data, (-1, 2)), columns=self.index_cols)
+        df2 = pd.DataFrame(np.reshape(self.data2, (-1, 2)), columns=self.index_cols)
 
         ret = dc.collapse_strings(df, working_columns=df.columns)
         ddinv = ret[1]
@@ -46,9 +65,12 @@ class TestCollapse(unittest.TestCase):
         self.assertEquals(numberNAs, 3)
 
     def test_convert_NAs_DataFrame(self):
-        df = pd.DataFrame(self.data3.T, columns=self.cols)
-        df = dc.convert_NAs_DataFrame(df, dropNAs=True, working_columns=self.cols)
+        df = pd.DataFrame(self.data3.T, columns=self.index_cols)
+        df = dc.convert_NAs_DataFrame(df, dropNAs=True, working_columns=self.index_cols)
         self.assertEquals(df.shape[0], 2)
+
+    def test_aggregate_negatives_boolean_style(self):
+        dc.aggregate_negatives_boolean_style(self.df, self.index_cols, self.at, self.st)
 
 if __name__ == '__main__':
     unittest.main()

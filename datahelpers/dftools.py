@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import datahelpers.collapse as dc
-from constants import protein_cols, triplet_index_cols
+from constants import protein_cols, triplet_index_cols, integer_agg_index
 
 
 def analyze_unique(df, column):
@@ -117,32 +117,46 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     return dfr
 
 
-def process_df_index(dft0, index_cols=triplet_index_cols,
+def get_multiplet_to_int_index(df, index_cols=triplet_index_cols, int_index_name='it'):
+    """
+
+    :param df:
+    :param index_cols:
+    :param int_index_name:
+    :return:
+    """
+    # get df with unique t = (t1, t2, ..  ti)
+    df2 = df[index_cols].drop_duplicates(index_cols)
+    # create proxy integer multiplet integer it <-> t
+    df3 = df2.set_index(index_cols).reset_index()
+    df4 = df3.reset_index().rename(columns={'index': int_index_name})
+    # merge back i_t into df with unique t = (t1, t2, t3) and i_h
+    df5 = pd.merge(df, df4, on=index_cols, how='left')
+
+    return df5
+
+
+def process_df_index(dft0, index_cols=triplet_index_cols, int_index_name=integer_agg_index,
                      prefer_triplet=False):
     """
     the default behaviour is to throw away
     :param dft0:
     :param index_cols:
+    :param int_index_name:
     :param prefer_triplet
     :return:
     """
 
     # get df with unique t = (t1, t2, t3) and i_h
     dfw = dft0[index_cols + ['hiid']].drop_duplicates(index_cols + ['hiid'])
-    # get df with unique t = (t1, t2, t3)
-    dfw2 = dfw[index_cols].drop_duplicates(index_cols)
-    # create proxy integer triplet integer i_t <-> t
-    dfw3 = dfw2.set_index(index_cols).reset_index()
-    dfw4 = dfw3.reset_index().rename(columns={'index': 'i_t'})
-    # merge back i_t into df with unique t = (t1, t2, t3) and i_h
-    dfw5 = pd.merge(dfw, dfw4, on=index_cols, how='left')
+    dfw5 = get_multiplet_to_int_index(dfw, index_cols)
     # create a unique index across i_t and i_h
     # in case there is an ambiguity - prefer 'hiid'
     if prefer_triplet:
         ll = ['hiid']
     else:
-        ll = ['i_t']
-    dfw6 = create_unique_index(dfw5, ['hiid', 'i_t'], ll)
+        ll = [int_index_name]
+    dfw6 = create_unique_index(dfw5, ['hiid', int_index_name], ll)
     df2 = pd.merge(dft0, dfw6, on=index_cols + ['hiid'], how='inner')
     return df2
 

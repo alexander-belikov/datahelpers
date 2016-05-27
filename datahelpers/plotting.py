@@ -63,7 +63,7 @@ def plot_hist_float_x(data, xranges, yranges=None, N=10, opacity=0.8, ylog_axis=
 
 
 def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
-              xticks_factor=1, opacity=0.5, fname=None):
+              xticks_factor=1, normed_flag=False, opacity=0.5, fname=None):
     """
 
     :param arr_list:
@@ -93,16 +93,17 @@ def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
     xrange = [min_data, max_data]
     plt.xlim(xrange)
 
-    if not yrange:
-        yrange = [1e0, max([d.shape[0] for d in arr_list])]
-    plt.ylim(yrange)
+    if not normed_flag:
+        if not yrange:
+            yrange = [1e0, max([d.shape[0] for d in arr_list])]
+        plt.ylim(yrange)
 
     if ylog_axis:
         ax.set_yscale('log')
 
     plt.xticks(x_ticks, x_labels)
     for arr in arr_list:
-        ll = plt.hist(arr, bins=x_bins,
-                      alpha=opacity, rwidth=delta_x)
+        ll = plt.hist(arr, bins=x_bins, histtype='step',
+                      alpha=opacity, rwidth=delta_x, normed=normed_flag)
     if fname:
         plt.savefig(fname)

@@ -6,11 +6,11 @@ from constants import na_names
 
 def convert_NAs_Series(obj):
     """
-
-    :param obj:
-    :param inplace:
+    convert various string representations of NaN to np.nan
+    :param obj: Series to be
     :return:
     """
+
     if isinstance(obj, Series):
 
         na_present = list(set(obj.unique()) & set(na_names))
@@ -326,49 +326,44 @@ def invert_dict_of_list(dd):
     return inv_dd
 
 
-def aggregate_negatives_boolean_style(dfi, up, dn, at, ng):
+def aggregate_negatives_boolean_style(dfi, index_cols, at, st):
     """
-    say we have a and b and the effect is either positive (1)
-    or negative (0), and the claim can be no (1) or yes (0)
+    in a DataFrame dfi the statement (L-formula) is identified by index_cols
+    it is completed by the column at (action type)
+    at is the predicate regarding the statement (True or False)
+    it can be interpreted as positive of negative action
 
-    then in boolean approximation (negative, no) = (positive, yes)
-    then in boolean approximation (negative, yes) = (positive, no)
+    ng is the predicate of the (index_cols, at) statement
 
-    the first part is to identify for which pairs
-    there are both actiontypes in the DataFrame df
+    the function finds such pairs (index_cols, at) for all rows in dfi,
+    for which at takes two values for each index_cols,
+    inverts at and ng for one of the values of at
 
+    ind at  ng
 
-    up  dn  at  ng
-
-    gA  gB  eff cl
-    a   b   0   0
-    a   b   0   1
-    a   b   1   0
-    a   b   1   1
+      eff cl
+    a   0   0
+    a   0   1
+    a   1   0
+    a   1   1
 
     :param dfi:
-    :param up:
-    :param dn:
+    :param index_cols:
     :param at:
+    :param ng:
     :return:
     """
-    dfi.reset_index(inplace=True)
-    updnat_dups = dfi[[up, dn, at]].drop_duplicates([up, dn, at])
-    updn_degenerate = updnat_dups.loc[updnat_dups.duplicated([up, dn]), [up, dn]]
-    updn_degenerate[at] = 0
-    updn_degenerate['flag'] = True
+    full_index = index_cols + [at]
+    dfw = dfi.reset_index()
+    dfw_mod = dfw.groupby(index_cols).apply(lambda x: float(x[at].sum())/x[at].shape[0] < 0.5).reset_index()
+    dfw_mod.rename(columns={0: at}, inplace=True)
+    dfw_mod['flag'] = True
 
     # TODO : publish bug pd.DataFrame.merge does not keep the original index
-
-    mask = dfi[[up, dn, at]].merge(updn_degenerate, how='left', on=[up, dn, at])
+    mask = dfw[full_index].merge(dfw_mod, how='left', on=full_index)
 
     mask.loc[mask['flag'].isnull(), 'flag'] = False
-    mask_neg_dups_at = mask['flag']
-
-    mask_neg_no = mask_neg_dups_at & (dfi[ng] == 1)
-    mask_neg_yes = mask_neg_dups_at & (dfi[ng] == 0)
-    dfi.loc[mask_neg_dups_at, at] = 1
-    dfi.loc[mask_neg_no, ng] = 0
-    dfi.loc[mask_neg_yes, ng] = 1
-
-    return dfi
+    m = mask['flag']
+    # print 'number of rows to be transformed', sum(mask_neg_dups_at)
+    dfw.loc[m, [at, st]] = ~dfw.loc[m, [at, st]]
+    return dfw
