@@ -14,7 +14,7 @@ def convert_NAs_Series(obj):
     if isinstance(obj, Series):
 
         na_present = list(set(obj.unique()) & set(na_names))
-        #TODO use reduce
+        # TODO use reduce
         for word in na_present:
             obj = obj.replace(word, np.nan)
 
