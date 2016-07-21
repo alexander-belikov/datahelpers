@@ -3,10 +3,10 @@
 from cython cimport view
 # from numpy.math cimport expl, logl, isinf, INFINITY, factorial
 from numpy.math cimport expl, logl, isinf, INFINITY
-import numpy as np
+from math import factorial
 
 
-ctypedef double dtype_t
+# ctypedef double dtype_t
 
 
 # cdef inline int _argmax(dtype_t[:] X) nogil:
@@ -31,8 +31,15 @@ ctypedef double dtype_t
 
 #     return logl(acc) + X_max
 
+cpdef double f(int k):
+    cdef double ret = factorial(k)
+    return ret
 
-cdef dtype_t _poi(double _lambda, int k):
+cpdef double l(double x):
+    cdef double ret = logl(x)
+    return ret
 
-    return (-_lambda + k*logl(_lambda) - logl(np.factorial(k)))
+# cpdef double poi(double _lambda, int k):
+
+#     return (-_lambda + k*logl(_lambda) - logl(factorial(k)))
 
