@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from constants import ye
 
 
@@ -29,6 +30,9 @@ def plot_hist_true_false(dft, fname=None, column_name='negative'):
 
     opacity = 0.3
     plt.xticks(x_ticks, x_labels)
+    sns.set_style("darkgrid")
+    # sns.distplot(data, bins=arange(floor(tlow), ceil(thi), 4), norm_hist=True, kde=False)
+
     ll = plt.hist([data_pos+1e-6, data_neg+1e-6], bins=x_bins, color=['b', 'r'],
                   alpha=opacity, stacked=True, rwidth=delta_x)
     if fname:
@@ -63,7 +67,7 @@ def plot_hist_float_x(data, xranges, yranges=None, N=10, opacity=0.8, ylog_axis=
 
 
 def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
-              xticks_factor=1, normed_flag=False, opacity=0.5, fname=None):
+              xticks_factor=1, normed_flag=False, opacity=0.5, linewidth=2, fname=None, y_axis_mult=None):
     """
 
     :param arr_list:
@@ -71,11 +75,12 @@ def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
     :param yrange:
     :param ylog_axis:
     :param xticks_factor:
+    :param normed_flag:
     :param opacity:
     :param fname:
     :return:
     """
-    fig = plt.figure(figsize=(6,6))
+    fig = plt.figure(figsize=(6, 6))
     rect = [0.15, 0.12, 0.8, 0.8]
     ax = fig.add_axes(rect)
 
@@ -93,17 +98,32 @@ def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
     xrange = [min_data, max_data]
     plt.xlim(xrange)
 
-    if not normed_flag:
-        if not yrange:
-            yrange = [1e0, max([d.shape[0] for d in arr_list])]
-        plt.ylim(yrange)
+    # if not normed_flag:
+    #     if not yrange:
+    #         yrange = [1e0, max([d.shape[0] for d in arr_list])]
+    #     plt.ylim(yrange)
 
     if ylog_axis:
         ax.set_yscale('log')
 
+    sns.set_style("whitegrid")
+    # sns.set_palette('bright')
+
     plt.xticks(x_ticks, x_labels)
+    hist_kw = {
+                'histtype': 'step',
+                # 'histtype': 'stepfilled',
+                'alpha': opacity,
+                'rwidth': delta_x, 'normed': normed_flag,
+                'lw': linewidth}
     for arr in arr_list:
-        ll = plt.hist(arr, bins=x_bins, histtype='step',
-                      alpha=opacity, rwidth=delta_x, normed=normed_flag)
+        ll = sns.distplot(arr, bins=x_bins, hist_kws=hist_kw, kde=False)
+
+    if y_axis_mult:
+        yr = ax.get_ylim()
+        yr_new = list(yr)
+        yr_new[1] = yr[1] + round(y_axis_mult*yr[1], -1)
+        ax.set_ylim(yr_new)
+
     if fname:
         plt.savefig(fname)
