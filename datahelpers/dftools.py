@@ -136,6 +136,24 @@ def get_multiplet_to_int_index(df, index_cols=triplet_index_cols, int_index_name
     return df5
 
 
+def attach_new_index(dfw, redux_dict, map_name, index_cols, new_index_name):
+    df_conv = collapse_column(dfw, redux_dict, map_name)
+    # create new index based on index_cols, col_reduced is a member of index_cols
+    df_conv_new_index = get_multiplet_to_int_index(df_conv, index_cols, new_index_name)
+
+    return df_conv_new_index
+
+
+def collapse_column(dfw, redux_dict, map_name):
+    col_orig, col_reduced = map_name
+    # 1) cut the part of dfw, whose domain is the domain of redux_dict map
+    mask = dfw[col_orig].isin(redux_dict.keys())
+
+    # 2) create col_reduced in df_conv
+    df_conv = dfw.loc[mask].copy()
+    df_conv[col_reduced] = df_conv[col_orig].apply(lambda x: redux_dict[x])
+    return df_conv
+
 def process_df_index(dft0, index_cols=triplet_index_cols, int_index_name=integer_agg_index,
                      prefer_triplet=False):
     """
