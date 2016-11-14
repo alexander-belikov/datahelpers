@@ -230,5 +230,22 @@ def compute_centralities(df, node_cols, edge_type, extra_attr):
     return df
 
 
+def extract_idc_within_frequency_interval(df, id_col, flag_col, freq_int):
+    val_low, val_hi = freq_int
+    ps_frac = df.groupby(id_col).apply(lambda x: float(sum(x[flag_col])) / x.shape[0])
+
+    # check - most popular claims
+    vc_idt = df[id_col].value_counts()
+
+    vc_idt.name = 'n_claims'
+    ps_frac.name = 'ps_frac'
+    df_info = pd.merge(pd.DataFrame(vc_idt), pd.DataFrame(ps_frac),
+                       left_index=True, right_index=True).sort_values('n_claims', ascending=False)
+
+    m_frac = (df_info['ps_frac'] > val_low) & (df_info['ps_frac'] < val_hi)
+    ids = df_info.loc[m_frac].index
+    return ids
+
+
 def XOR(s1, s2):
     return ~(s1 | s2) | (s1 & s2)
