@@ -3,6 +3,14 @@ import numpy as np
 import seaborn as sns
 from constants import ye
 from bm_support.math_aux import find_intlike_delta
+from matplotlib.pyplot import subplots
+from seaborn import set_style
+from seaborn import plt as sns_plt
+from os import mkdir
+from os.path import exists
+from functools import partial
+from bm_support.math_aux import steplike_logistic, np_logistic_step
+from numpy import array, arange, mean, floor, ceil
 
 
 def plot_hist_true_false(dft, N=5, fname=None, x_column_name=ye,
@@ -149,7 +157,9 @@ def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
                 'normed': normed_flag,
                 'lw': linewidth}
     for arr in arr_list:
-        ll = sns.distplot(arr - 1e-6, bins=x_bins, hist_kws=hist_kw, kde=False)
+        tmp_arr = min(arr) + (1. - 1e-8)*(arr - min(arr))
+
+        ll = sns.distplot(tmp_arr, bins=x_bins, hist_kws=hist_kw, kde=False)
 
     if y_axis_mult:
         yr = ax.get_ylim()
@@ -159,3 +169,82 @@ def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
 
     if fname:
         plt.savefig(fname)
+
+
+def plot_beta_steps(n_features_ext, dict_base, raw_best_dict_plot_beta, tlow, thi, sorted_first,
+                    fname_prefix=None, path='./', format='pdf'):
+
+    xr = floor(tlow), ceil(thi)
+    xs = arange(xr[0], xr[1], 0.1)
+
+    for j in range(n_features_ext):
+        dict_rename = {k + str(j): dict_base[k] for k in dict_base.keys()}
+        align_list = ['b1', 'b2', 't0', 'g']
+        pps_der = {dict_rename[k]: raw_best_dict_plot_beta[k] for k in dict_rename.keys()}
+        # pprint(pps_der)
+        pps_der_list = [pps_der[k] for k in align_list]
+
+        llists = [pps_der_list]
+        foos = [partial(np_logistic_step, *ps) for ps in llists]
+        yss = [map(foo, xs) for foo in foos]
+        f, ax = subplots(figsize=(7, 7))
+
+        ax.set_xlim(xr)
+        set_style("darkgrid")
+
+        lss = ['-', '--']
+        for ys, ls in zip(yss, lss):
+            sns_plt.plot(xs, ys, ls)
+
+        if fname_prefix:
+            if not exists(path):
+                mkdir(path)
+            if not path.endswith('/'):
+                path += '/'
+            plt.savefig("%s%s_%s%s.%s" % (path, fname_prefix, 'bestfit_feature_', str(j), format))
+
+    for j in range(n_features_ext):
+        f, ax = subplots(figsize=(7, 7))
+        xr = floor(tlow), ceil(thi)
+        ax.set_xlim(xr)
+        #     ax.set_ylim([beta_min, beta_max])
+        xs = arange(xr[0], xr[1], 0.1)
+        set_style("darkgrid")
+        dict_base = {'betaCenter_': 't0', 'betaLeft_': 'b1', 'betaRight_': 'b2', 'betaSteep_': 'g'}
+        dict_rename = {k + str(j): dict_base[k] for k in dict_base.keys()}
+        align_list = ['b1', 'b2', 't0', 'g']
+        #     pps_plot_beta = {k : pps[k] for k in pps if 'beta' in k and not 'xprior' in k}
+        #     pps_orig = {}
+        #     pps_orig = {dict_rename[k]:pps_plot_beta[k] for k in dict_rename.keys()}
+        #     pps_orig_list = [pps_orig[k] for k in align_list]
+        #     ys = map(partial(np_logistic_step, *pps_orig_list), xs)
+        #     sns.plt.plot(xs, ys, ls='-', lw=2)
+
+        llist = []
+
+        for rbdp in sorted_first:
+            raw_best_dict_plot_beta = {k: rbdp[1][k]
+                                       for k in sorted_first[0][1].keys()
+                                       if 'beta' in k and not 'xprior' in k}
+            pps_der = {dict_rename[k]: raw_best_dict_plot_beta[k] for k in dict_rename.keys()}
+            pps_der_list = [pps_der[k] for k in align_list]
+
+            llist.append(pps_der_list)
+
+        foos = [partial(np_logistic_step, *ps) for ps in llist]
+        yss = [map(foo, xs) for foo in foos]
+
+        means = mean(array(llist), axis=0)
+        ys = map(partial(np_logistic_step, *means), xs)
+        sns_plt.plot(xs, ys, ls='-', lw=2)
+
+        for ys in yss:
+            sns_plt.plot(xs, ys, ls='--', lw=0.5)
+
+        if fname_prefix:
+            if not exists(path):
+                mkdir(path)
+            if not path.endswith('/'):
+                path += '/'
+            plt.savefig("%s%s_%s%s.%s" % (path, fname_prefix, 'fits_stats_feature_', str(j), format))
+
