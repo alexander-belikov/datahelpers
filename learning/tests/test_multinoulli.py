@@ -1,12 +1,10 @@
-import numpy as np
-from numpy import random as rn
 from numpy import log, arange, zeros
 from numpy.testing import assert_array_almost_equal
-import unittest
+from unittest import TestCase, main
 import learning.Multinoulli as lm
 
 
-class TestMulti(unittest.TestCase):
+class TestMulti(TestCase):
 
     K = 10
     m1 = lm.Multinoulli(K)
@@ -35,4 +33,4 @@ class TestMulti(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    main()
