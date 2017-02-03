@@ -96,14 +96,13 @@ def get_table(session=None, hostname=None, username=None,
         session_dict['passwd'] = password
     session_dict['db'] = database
 
-    conn = connect(**session_dict)
-
-    if query_dict and 'columns' in query_dict and query_dict['columns']:
+    if query_dict and 'columns' in query_dict.keys():
         cols = ', '.join(map(lambda x: str(x), query_dict['columns']))
     else:
         cols = '*'
+
     query = 'select ' + cols + ' from ' + table
-    if query_dict and 'mask' in query_dict and query_dict['mask']:
+    if query_dict and 'mask' in query_dict.keys():
         cs = ' where '
         for k in query_dict['mask'].keys():
             cs += k + ' in (%s)'
@@ -111,9 +110,25 @@ def get_table(session=None, hostname=None, username=None,
             cs %= ids
         query += cs
 
-    if query_dict['nrows']:
+    if 'nrows' in query_dict.keys():
         query += ' limit ' + str(query_dict['nrows'])
     query += ';'
+
+    conn = connect(**session_dict)
     df = read_sql(query, con=conn)
     conn.close()
+    return df
+
+
+def get_pmids_features(list_pmids):
+    iss = 'issn'
+    ye = 'year'
+    pm = 'pmid'
+
+    # create the query dict
+    qq = {'columns': [pm, iss, ye], 'mask': {pm: []}}
+
+    qq['mask'][pm] = list_pmids
+    qq['columns'] = [pm, ye, iss]
+    df = get_table('a', database='medline', table='doc', query_dict=qq)
     return df
