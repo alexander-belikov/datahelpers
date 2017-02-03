@@ -6,8 +6,8 @@ from unittest import TestCase, main
 
 class TestDFTolls(TestCase):
     df0 = DataFrame({'i1': [0, 1, 2, 2, 2, 3, 4, 5, 5],
-                        'i2': [0, 0, 1, 2, 3, 4, 5, 5, 6],
-                        'i3': ['a']*9})
+                     'i2': [0, 0, 1, 2, 3, 4, 5, 5, 6],
+                     'i3': ['a']*9})
 
     not_sni = [1, 2, 3, 4, 5, 0]
     i1_sni = [1, 1, 2, 3, 4, 0]
