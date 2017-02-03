@@ -1,6 +1,7 @@
-import datahelpers.collapse as dc
-from ..datahelpers.collapse
-import pandas as pd
+from ..collapse import collapse_series_simple, \
+    collapse_strings, convert_NAs_Series, \
+    convert_NAs_DataFrame, aggregate_negatives_boolean_style
+from pandas import Series, DataFrame, concat
 import numpy as np
 from numpy import random as rn
 import unittest
@@ -35,43 +36,43 @@ class TestCollapse(unittest.TestCase):
     tf = np.tile(vals[2], (2, 1))
     ff = np.tile(vals[3], (4, 1))
     data_bool = np.vstack([tt, ft, tf, ff])
-    dfa = pd.DataFrame(index_c, columns=index_cols)
-    dfb = pd.DataFrame(data_bool, columns=[at, st])
-    df = pd.concat([dfa, dfb], axis=1)
+    dfa = DataFrame(index_c, columns=index_cols)
+    dfb = DataFrame(data_bool, columns=[at, st])
+    df = concat([dfa, dfb], axis=1)
 
     def test_collapse_series_simple(self):
-        s = pd.Series(self.data)
-        s2 = pd.Series(self.data2)
+        s = Series(self.data)
+        s2 = Series(self.data2)
 
-        ret = dc.collapse_series_simple(s)
+        ret = collapse_series_simple(s)
         ddinv = ret[1]
-        ret3 = dc.collapse_series_simple(s2, ddinv)
+        ret3 = collapse_series_simple(s2, ddinv)
 
         self.assertEquals(set(ret3[1].keys()), set(self.strings))
 
     def test_collapse_strings(self):
-        df = pd.DataFrame(np.reshape(self.data, (-1, 2)), columns=self.index_cols)
-        df2 = pd.DataFrame(np.reshape(self.data2, (-1, 2)), columns=self.index_cols)
+        df = DataFrame(np.reshape(self.data, (-1, 2)), columns=self.index_cols)
+        df2 = DataFrame(np.reshape(self.data2, (-1, 2)), columns=self.index_cols)
 
-        ret = dc.collapse_strings(df, working_columns=df.columns)
+        ret = collapse_strings(df, working_columns=df.columns)
         ddinv = ret[1]
-        ret3 = dc.collapse_strings(df2, str_dicts=ddinv, working_columns=df2.columns)
+        ret3 = collapse_strings(df2, str_dicts=ddinv, working_columns=df2.columns)
 
         self.assertEquals(ret3[1], ret[1])
 
     def test_convert_NAs_Series(self):
-        s = pd.Series(self.strings_NAs)
-        s = dc.convert_NAs_Series(s)
+        s = Series(self.strings_NAs)
+        s = convert_NAs_Series(s)
         numberNAs = sum(s.isnull())
         self.assertEquals(numberNAs, 3)
 
     def test_convert_NAs_DataFrame(self):
-        df = pd.DataFrame(self.data3.T, columns=self.index_cols)
-        df = dc.convert_NAs_DataFrame(df, dropNAs=True, working_columns=self.index_cols)
+        df = DataFrame(self.data3.T, columns=self.index_cols)
+        df = convert_NAs_DataFrame(df, dropNAs=True, working_columns=self.index_cols)
         self.assertEquals(df.shape[0], 2)
 
     def test_aggregate_negatives_boolean_style(self):
-        dc.aggregate_negatives_boolean_style(self.df, self.index_cols, self.at, self.st)
+        aggregate_negatives_boolean_style(self.df, self.index_cols, self.at, self.st)
 
 if __name__ == '__main__':
     unittest.main()
