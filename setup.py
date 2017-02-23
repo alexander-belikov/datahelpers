@@ -27,7 +27,7 @@ setup(
     license="BSD",
     keywords="data wrangle pandas mysql",
     url="git@github.com:alexander-belikov/datahelpers.git",
-    packages=['datahelpers', 'learning', 'tests'],
+    packages=['datahelpers', 'learning'],
     long_description=read('README'),
     classifiers=[
         "Development Status :: 0 - Alpha",
@@ -35,7 +35,9 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     install_requires=[
-          'pymysql', 'pandas', 'setuptools', 'PyWavelets'
+        'pymysql', 'pandas',
+        'setuptools', 'PyWavelets',
+        'Cython'
       ],
     include_dirs=[np.get_include()],
     ext_modules=cythonize('./learning/*.pyx')

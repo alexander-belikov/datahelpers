@@ -1,7 +1,7 @@
 import numpy as np
-import regular as reg
 from pandas import to_numeric, DataFrame, Series
-from constants import na_names
+from .constants import na_names
+from .regular import chain_regexp_transforms
 
 
 def convert_NAs_Series(obj):
@@ -248,7 +248,7 @@ def collapse_strings(df_orig, str_dicts=None, working_columns=[],
                 except UnicodeEncodeError:
                     df[c] = df[c].astype('unicode')
                 if verbose:
-                    print 'process column', c
+                    print('process column', c)
                 if c not in str_dicts.keys():
                     str_dicts[c] = None
                 df[c], str_dicts[c] = collapse(df[c], str_dicts[c])
@@ -268,10 +268,10 @@ def regexp_reduce_yield_agg_dict(df, columns):
     agg_regexp_dict = {}
     for c in columns:
         uni_vals = df[c].unique()
-        keys_prime = map(reg.chain_regexp_transforms, uni_vals)
+        keys_prime = map(chain_regexp_transforms, uni_vals)
         keys_prime_set = set(keys_prime)
         keys_trans = set(uni_vals) - keys_prime_set
-        regexp_dict = {k: reg.chain_regexp_transforms(k) for k in keys_trans}
+        regexp_dict = {k: chain_regexp_transforms(k) for k in keys_trans}
     # mask of such entries that are regexp transformed
         m = df[c].isin(keys_trans)
         df.loc[m, c] = df.loc[m, c].apply(lambda x: regexp_dict[x])

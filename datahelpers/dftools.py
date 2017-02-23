@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-import datahelpers.collapse as dc
-from constants import protein_cols, triplet_index_cols, integer_agg_index
+from .constants import protein_cols, triplet_index_cols, integer_agg_index
+from .collapse import regexp_reduce_yield_agg_dict
 
 
 def analyze_unique(df, column):
@@ -206,13 +206,13 @@ def regexp_collapse_protein_cols(dft0, collapse_df=True, regexp_columns=protein_
     """
 
     df = dft0.copy()
-    df, dd, dd_regexp = dc.regexp_reduce_yield_agg_dict(df, regexp_columns)
+    df, dd, dd_regexp = regexp_reduce_yield_agg_dict(df, regexp_columns)
     df_dd = {}
 
     if collapse_df:
         for c in protein_cols:
             df_dd[c] = dd
-        df, dd_dd = dc.collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
+        df, dd_dd = collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
     return df, df_dd
 
 
