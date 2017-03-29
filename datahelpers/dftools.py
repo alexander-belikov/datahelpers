@@ -140,7 +140,7 @@ def attach_new_index(dfw, redux_dict, map_name, index_cols, new_index_name):
     """
 
     :param dfw: DataFrame to work on
-    :param redux_dict: dict of values reduction
+    :param redux_dict: dict of values' reduction
     :param map_name: tuple of column names (orig, transformed)
     :param index_cols: columns to use as index
     :param new_index_name: new index column name
@@ -247,9 +247,9 @@ def compute_centralities(df, node_cols, edge_type, extra_attr):
     return df
 
 
-def extract_idc_within_frequency_interval(df, id_col, flag_col, freq_int):
+def extract_idc_within_frequency_interval(df, id_col, flag_col, freq_int, min_length=0):
     val_low, val_hi = freq_int
-    ps_frac = df.groupby(id_col).apply(lambda x: float(sum(x[flag_col])) / x.shape[0])
+    ps_frac = df.groupby(id_col).apply(lambda x: float(sum(x[flag_col]))/x.shape[0])
 
     # check - most popular claims
     vc_idt = df[id_col].value_counts()
@@ -259,8 +259,9 @@ def extract_idc_within_frequency_interval(df, id_col, flag_col, freq_int):
     df_info = pd.merge(pd.DataFrame(vc_idt), pd.DataFrame(ps_frac),
                        left_index=True, right_index=True).sort_values('n_claims', ascending=False)
 
-    m_frac = (df_info['ps_frac'] > val_low) & (df_info['ps_frac'] < val_hi)
-    ids = df_info.loc[m_frac].index
+    m_frac = (df_info['ps_frac'] > val_low) & (df_info['ps_frac'] < val_hi) & (df_info['n_claims'] > min_length)
+    dfr = df_info.loc[m_frac].sort_values('n_claims', ascending=False)
+    ids = dfr.index
     return ids
 
 

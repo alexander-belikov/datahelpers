@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from constants import ye
+from .constants import ye
 from bm_support.math_aux import find_intlike_delta
 from matplotlib.pyplot import subplots
 from seaborn import set_style
@@ -124,7 +124,7 @@ def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
         min_data = min(mins)
         max_data = max(maxs)
 
-    print min_data, max_data
+    print(min_data, max_data)
     delta_x = find_intlike_delta(min_data, max_data, approx_nbins)
     x_bins = np.arange(min_data, max_data + 2*delta_x, delta_x)
     x_ticks = np.arange(min_data, max_data + 3*delta_x, delta_x)

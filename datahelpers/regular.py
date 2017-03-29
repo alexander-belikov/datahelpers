@@ -1,4 +1,5 @@
 import re
+from functools import reduce
 
 list_to_strip_sing = ['protein', 'gene', 'cell', 'enzyme']
 list_to_strip = list_to_strip_sing + list(map(lambda x: x+'s', list_to_strip_sing))
