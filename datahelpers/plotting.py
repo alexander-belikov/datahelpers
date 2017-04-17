@@ -9,18 +9,23 @@ from seaborn import plt as sns_plt
 from os import mkdir
 from os.path import exists
 from functools import partial
-from bm_support.math_aux import steplike_logistic, np_logistic_step
+from bm_support.math_aux import np_logistic_step
 from numpy import array, arange, mean, floor, ceil
 
 
 def plot_hist_true_false(dft, N=5, fname=None, x_column_name=ye,
                          y_column_name='negative', normed_flag=False,
-                         linewidth=1.0, title='',
-                         sns_style='darkgrid'):
+                         title='', alpha=0.7,
+                         sns_style='darkgrid', integer_bbs=True,
+                         squeeze_uniform=False):
 
     data = dft[x_column_name]
     min_data = min(data)
     max_data = max(data)
+    if integer_bbs:
+        min_data = floor(min_data)
+        max_data = ceil(max_data)
+
     m = (dft[y_column_name] == 1)
     data_pos = dft.loc[m, x_column_name]
     data_neg = dft.loc[~m, x_column_name]
@@ -32,13 +37,14 @@ def plot_hist_true_false(dft, N=5, fname=None, x_column_name=ye,
 
     delta_x = max(int((max_data - min_data)/N), 1)
     x_bins = np.arange(min_data, max_data + 2*delta_x, delta_x)
+    x_centers = x_bins[1:] - 0.5*delta_x
+
     x_ticks = np.arange(min_data-delta_x, max_data + 3*delta_x, delta_x)
     x_labels = [str(int(t)) for t in x_ticks]
 
     xranges = [min_data, max_data]
     plt.xlim(xranges)
 
-    opacity = 0.3
     plt.xticks(x_ticks, x_labels)
     sns.set_style(sns_style)
 
@@ -58,9 +64,20 @@ def plot_hist_true_false(dft, N=5, fname=None, x_column_name=ye,
     # for arr, c in zip(ldata, lcolors):
     #     hist_kw['color'] = c
     #     ll = sns.distplot(arr, bins=x_bins, hist_kws=hist_kw, kde=False)
-    sns.set_style("darkgrid")
-    ll = plt.hist([data_pos+1e-6, data_neg+1e-6], bins=x_bins, color=['b', 'r'],
-                  alpha=opacity, stacked=True, rwidth=delta_x, normed=normed_flag)
+
+    if squeeze_uniform:
+        p_binned, _ = np.histogram(data_pos, x_bins)
+        n_binned, _ = np.histogram(data_neg, x_bins)
+        s_binned = p_binned+n_binned
+        p_binned = p_binned/s_binned
+        n_binned = n_binned/s_binned
+
+        plt.bar(x_centers, p_binned, width=delta_x, alpha=alpha)
+        plt.bar(x_centers, n_binned, bottom=p_binned, width=delta_x, alpha=alpha)
+
+    else:
+        ll = plt.hist([data_pos+1e-6, data_neg+1e-6], bins=x_bins,
+                      alpha=alpha, stacked=True, rwidth=delta_x, normed=normed_flag)
     if fname:
         plt.savefig(fname)
     return ax
@@ -93,11 +110,10 @@ def plot_hist_float_x(data, xranges, yranges=None, N=10, opacity=0.8, ylog_axis=
     return ll
 
 
-def plot_hist(arr_list, approx_nbins=10, yrange=[], ylog_axis=False,
+def plot_hist(arr_list, approx_nbins=10, ylog_axis=False,
               xticks_factor=1, normed_flag=False, opacity=0.5, linewidth=2,
               fname=None, y_axis_mult=None, title='', integerize=False,
-              int_xlabels=True,
-              sns_style='darkgrid'):
+              int_xlabels=True, sns_style='darkgrid'):
     """
 
     :param arr_list:

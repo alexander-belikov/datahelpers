@@ -1,8 +1,6 @@
 import os
 from setuptools import setup
 from distutils.core import setup
-from distutils.extension import Extension
-from Cython.Build import cythonize
 import numpy as np
 
 # Utility function to read the README file.
@@ -14,9 +12,6 @@ import numpy as np
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
-ext_modules=[
-    Extension("test", ["./learning/test.pyx"]),
-    Extension("aux", ["./learning/_aux.pyx"])]
 
 setup(
     name="datahelpers",
@@ -27,7 +22,7 @@ setup(
     license="BSD",
     keywords="data wrangle pandas mysql",
     url="git@github.com:alexander-belikov/datahelpers.git",
-    packages=['datahelpers', 'learning'],
+    packages=['datahelpers'],
     long_description=read('README'),
     classifiers=[
         "Development Status :: 0 - Alpha",
@@ -36,9 +31,6 @@ setup(
     ],
     install_requires=[
         'pymysql', 'pandas',
-        'setuptools', 'PyWavelets',
-        'Cython'
-      ],
-    include_dirs=[np.get_include()],
-    ext_modules=cythonize('./learning/*.pyx')
+        'setuptools', 'PyWavelets'],
+    include_dirs=[np.get_include()]
 )
