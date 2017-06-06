@@ -141,7 +141,7 @@ dfi4 = pd.merge(dfi3, df_feature_cut, on=pm)
 df_ha = pd.read_csv('~/data/kl/raw/human_action.txt.gz',
                     sep='\t', index_col=None, compression='gzip')
 
-with open(expanduser('~/data/kl/claims/actions.json'), 'r') as fp:
+with open(expanduser('~/data/kl/claims/actions_v2.json'), 'r') as fp:
     agg_act_dict = json.load(fp)
 
 bools = {'true': True, 'false': False}
@@ -173,5 +173,5 @@ print('number of negaive claims on reduced statements {0}'.format(sum(~dfi5[ps])
 dfi5[ps] = dfi5[ps].astype(int)
 dfi5[at] = dfi5[at].astype(int)
 
-with gzip.open(expanduser('~/data/kl/claims/df_cs_8.pgz'), 'wb') as fp:
+with gzip.open(expanduser('~/data/kl/claims/df_cs_9.pgz'), 'wb') as fp:
     pickle.dump(dfi5, fp)

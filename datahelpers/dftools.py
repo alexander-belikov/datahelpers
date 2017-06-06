@@ -261,7 +261,7 @@ def extract_idc_within_frequency_interval(df, id_col, flag_col, freq_int, min_le
 
     m_frac = (df_info['ps_frac'] > val_low) & (df_info['ps_frac'] < val_hi) & (df_info['n_claims'] > min_length)
     dfr = df_info.loc[m_frac].sort_values('n_claims', ascending=False)
-    ids = dfr.index
+    ids = list(dfr.index)
     return ids
 
 

@@ -140,15 +140,16 @@ def plot_hist(arr_list, approx_nbins=10, ylog_axis=False,
         min_data = min(mins)
         max_data = max(maxs)
 
-    print(min_data, max_data)
     delta_x = find_intlike_delta(min_data, max_data, approx_nbins)
+    print(min_data, max_data, delta_x)
     x_bins = np.arange(min_data, max_data + 2*delta_x, delta_x)
+    print(x_bins)
     x_ticks = np.arange(min_data, max_data + 3*delta_x, delta_x)
     x_ticks = x_ticks[::xticks_factor]
     if int_xlabels:
         x_labels = [str(int(t)) for t in x_ticks]
     else:
-        x_labels = [str(t) for t in x_ticks]
+        x_labels = ['{0:.2e}'.format(t) for t in x_ticks]
 
     xrange = [min_data, max_data]
     plt.xlim(xrange)

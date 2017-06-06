@@ -32,8 +32,9 @@ ai = 'ai'
 ai_cdf = 'ai_cdf'
 hi_ai = 'hiai'
 ti = 'time'
+version = 9
 
-with gzip.open(expanduser('~/data/kl/claims/df_cs_8.pgz'), 'rb') as fp:
+with gzip.open(expanduser('~/data/kl/claims/df_cs_{0}.pgz'.format(version)), 'rb') as fp:
     df = pickle.load(fp)
 
 transform_time = True
@@ -55,6 +56,7 @@ a = 0.1
 b = 0.9
 n = 20
 ids = dfto.extract_idc_within_frequency_interval(dft, ni, ps, (a, b), n)
+print('number of unique ids : {0}'.format(len(ids)))
 
 mask_ids = dft[ni].isin(ids)
 means = dft.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].mean())
@@ -67,7 +69,7 @@ means_lens = pd.merge(pd.DataFrame(means, columns=['mean']), pd.DataFrame(sizes,
 
 df_stats = pd.merge(df_uniques, means_lens, right_index=True, left_on=ni).sort_values(['len'], ascending=False)
 
-df_stats.to_csv(expanduser('~/data/kl/claims/gw_pairs_freq_n_{0}_a_{1}_b_{2}.csv.gz'.format(n, a, b)),
+df_stats.to_csv(expanduser('~/data/kl/claims/gw_pairs_freq_n_{0}_a_{1}_b_{2}_v_{3}.csv.gz'.format(n, a, b, version)),
                 compression='gzip', index=False)
 
 ids_props = {}
@@ -168,5 +170,6 @@ for batch in batches:
 
 
 with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_{1}_'
-                          'n_{2}_a_{3}_b_{4}.pgz'.format('_'.join(important_cols), max_size, n, a, b)), 'wb') as fp:
+                          'n_{2}_a_{3}_b_{4}_v_{5}.pgz'.format('_'.join(important_cols), max_size,
+                                                               n, a, b, version)), 'wb') as fp:
     pickle.dump(data_batches, fp)
