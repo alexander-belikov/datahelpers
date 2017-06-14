@@ -164,6 +164,8 @@ print(sum(dfi5['year'] < 1990), dfi5.shape[0],
 # the actions can as positive and negative
 # by default the action is deemed positive
 # the claim
+# ps is logical xor between at and ng
+# ps = (at | ng) ^ (at & ng)
 mask_negs = ~(dfi5[at])
 print(sum(mask_negs), mask_negs.shape[0])
 dfi5[ps] = ~dfi5[ng]

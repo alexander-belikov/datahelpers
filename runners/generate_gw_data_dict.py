@@ -73,18 +73,19 @@ df_stats.to_csv(expanduser('~/data/kl/claims/gw_pairs_freq_v_{0}_n_{1}_a_{2}_b_{
                 compression='gzip', index=False)
 
 ids_props = {}
-feauture_cols = [ai, hi_ai]
+feature_cols = [ai, hi_ai]
 
+# obtain basic stats for feature_cols
 for ii in ids:
     df_cut = dft.loc[dft[ni].isin([ii])]
     ii_len = df_cut.shape[0]
-    means = {'mean_{0}'.format(c): df_cut[c].mean() for c in feauture_cols}
-    stds = {'std_{0}'.format(c): df_cut[c].std() for c in feauture_cols}
-    mins = {'min_{0}'.format(c): df_cut[c].min() for c in feauture_cols}
-    maxs = {'max_{0}'.format(c): df_cut[c].max() for c in feauture_cols}
-    left = {'left_{0}'.format(c): means['mean_{0}'.format(c)] - stds['std_{0}'.format(c)] for c in feauture_cols}
-    right = {'right_{0}'.format(c): means['mean_{0}'.format(c)] + stds['std_{0}'.format(c)] for c in feauture_cols}
-    densities = {'den_{0}'.format(c): 2*stds['std_{0}'.format(c)]/ii_len for c in feauture_cols}
+    means = {'mean_{0}'.format(c): df_cut[c].mean() for c in feature_cols}
+    stds = {'std_{0}'.format(c): df_cut[c].std() for c in feature_cols}
+    mins = {'min_{0}'.format(c): df_cut[c].min() for c in feature_cols}
+    maxs = {'max_{0}'.format(c): df_cut[c].max() for c in feature_cols}
+    left = {'left_{0}'.format(c): means['mean_{0}'.format(c)] - stds['std_{0}'.format(c)] for c in feature_cols}
+    right = {'right_{0}'.format(c): means['mean_{0}'.format(c)] + stds['std_{0}'.format(c)] for c in feature_cols}
+    densities = {'den_{0}'.format(c): 2*stds['std_{0}'.format(c)]/ii_len for c in feature_cols}
     ids_props[ii] = {'len': ii_len}
     ids_props[ii].update(means)
     ids_props[ii].update(stds)
@@ -108,6 +109,9 @@ max_size = 1000
 batches = []
 batches_lens = []
 lrs = []
+
+# the following block answers the question how to sample ids among a fixed number of batches
+# approximately uniformly in ai
 
 while sdf.shape[0] > 0:
     batch = []
@@ -151,10 +155,10 @@ data_batches = []
 
 # feauture_cols = [hi_ai]
 # feauture_cols = [ai, hi_ai, pr]
-feauture_cols = [ai, hi_ai]
+feature_cols = [ai, hi_ai]
 
 # important_cols = [iden] + feauture_cols + [ps]
-important_cols = [ye, iden] + feauture_cols + [ps]
+important_cols = [ye, iden] + feature_cols + [ps]
 
 for batch in batches:
     data_dict = {str(idc): dft.loc[dft[ni].isin([idc]), important_cols].values.T[:] for idc in batch}
@@ -162,8 +166,8 @@ for batch in batches:
     if transform_time:
         for k, d in data_dict.items():
             sc = MinMaxScaler()
-            d2 = d.copy()
-            d2[0] = np.squeeze(sc.fit_transform(d[0].astype(np.float).reshape(-1, 1)))
+            d2 = d.copy().astype(np.float)
+            d2[0] = np.squeeze(sc.fit_transform(d[0].reshape(-1, 1)))
             data_dict2.update({k: d2})
    
     data_batches.append(data_dict2)
