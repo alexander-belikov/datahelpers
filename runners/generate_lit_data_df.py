@@ -47,8 +47,13 @@ pmids = df['PMID'].drop_duplicates()
 # pmids2 = pd.DataFrame(pmids.unique(), columns=[pm])
 pmids2 = pd.DataFrame(pmids.values, index=pmids.index, columns=[pm]).reset_index()
 
-df[up] = df['Theme'].apply(lambda x: x.split(':')[-1])
-df[dn] = df['Cause'].apply(lambda x: x.split(':')[-1])
+mcut = (df['Theme'].str.contains('_')) | (df['Cause'].str.contains('_'))
+print(float(sum(~mcut))/mcut.shape[0])
+
+df = df[~mcut]
+
+df[up] = df['Cause'].apply(lambda x: x.split(':')[-1])
+df[dn] = df['Theme'].apply(lambda x: x.split(':')[-1])
 m = (df['Regulation Type'] == 'Positive_regulation')
 
 df[at] = True
