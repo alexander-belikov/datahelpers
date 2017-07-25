@@ -101,7 +101,6 @@ df_pmid = df_pmid.loc[~df_pmid['year'].isnull()]
 df_pmid['year'] = df_pmid['year'].astype(int)
 set_pmids_issns = set(df_pmid['issn'].unique())
 
-
 # retrieve issn-ye-ef-ai table (issn-ye-ai)
 df_ai = pd.read_csv(expanduser('~/data/kl/eigen/ef_ai_1990_2014.csv.gz'), index_col=0, compression='gzip')
 
@@ -145,8 +144,8 @@ df_ai = df_ai.rename(columns={'year': 'ai_year'})
 df_feature = pd.merge(df_pmid3, df_ai, left_on=['issn', 'proxy_year'], right_on=['issn', 'ai_year'])
 df_feature_cut = df_feature[['pmid', 'ai_cdf']].rename(columns={'ai_cdf': 'ai'})
 dfi4 = pd.merge(dfi3, df_feature_cut, on=pm)
-# merge (id-pm-claims-issn-ye-ai) onto (id-up-dn)
 
+# merge (id-pm-claims-issn-ye-ai) onto (id-up-dn)
 df_ha = pd.read_csv('~/data/kl/raw/human_action.txt.gz',
                     sep='\t', index_col=None, compression='gzip')
 
