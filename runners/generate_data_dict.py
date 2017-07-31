@@ -7,6 +7,7 @@ import gzip
 import pickle
 from os.path import expanduser
 from datahelpers.sampling import split_to_subsamples
+from datahelpers.partition import partition_dict
 
 ye = 'year'
 up = 'up'
@@ -23,26 +24,31 @@ def main(df_type, version, max_size, present_columns, transform_columns, a, b, n
     with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(df_type, version)), 'rb') as fp:
         df = pickle.load(fp)
 
-    if ai in present_columns:
-        alpha = 0.9
-        mask = (df[ai] > alpha)
-        df[ai + 'hi'] = 0
-        df.loc[mask, ai + 'hi'] = 1
-        df[ai] = (df[ai] - alpha) / (1 - alpha)
-        print(sum(mask), sum(~mask))
-        df.loc[~mask, ai] = 0
-        present_columns.insert(present_columns.index(ai) + 1, ai + 'hi')
+    # if ai in present_columns:
+    #     alpha = 0.9
+    #     mask = (df[ai] > alpha)
+    #     df[ai + 'hi'] = 0
+    #     df.loc[mask, ai + 'hi'] = 1
+    #     df[ai] = (df[ai] - alpha) / (1 - alpha)
+    #     print(sum(mask), sum(~mask))
+    #     df.loc[~mask, ai] = 0
+    #     present_columns.insert(present_columns.index(ai) + 1, ai + 'hi')
 
     print(present_columns)
+
+    if ai in present_columns:
+        ind_a = present_columns.index('ai')
+        ind_b = present_columns.index('ai') + 1
+        # ind_b = present_columns.index('aihi') + 1
+    else:
+        ind_b = len(present_columns)
+        ind_a = ind_b - 1
 
     if iden in present_columns:
         df[iden] = 1
 
     dft = df[[ni] + present_columns].copy()
 
-    a = 0.1
-    b = 0.9
-    n = 20
     ids = extract_idc_within_frequency_interval(dft, ni, ps, (a, b), n)
     print('number of unique ids : {0}'.format(len(ids)))
 
@@ -71,13 +77,29 @@ def main(df_type, version, max_size, present_columns, transform_columns, a, b, n
                 sc = MinMaxScaler()
                 d2 = d.copy().astype(np.float)
                 d2[index] = np.squeeze(sc.fit_transform(d[index].reshape(-1, 1)))
-                data_dict2[k]= d2
+                data_dict2[k] = d2
 
-    metric_dict = {k: v.shape[1] for k, v in data_dict2.items()}
+    # metric_dict = {k: v.shape[1] for k, v in data_dict2.items()}
+    # idc_partition = split_to_subsamples(metric_dict, size=max_size)
 
-    idc_partition = split_to_subsamples(metric_dict, size=max_size)
+    # calculate optimal bin size
+    # allow 1 - fraction_full to be empty
+    # bin_size optimal in the sense that for an optimal-like solution
+    # there will no half full bins
 
+    total_size = sum(map(lambda x: x.shape[1], data_dict2.values()))
+    fraction_full = 0.95
+
+    bin_size = round(total_size / round(total_size / max_size) / fraction_full, -1)
+
+    idc_partition = partition_dict(data_dict2, ind_a, ind_b, bin_size)
+
+    print('number of batches in partion: {0}; total size {1}'.format(idc_partition, total_size))
     data_batches = [{k: data_dict2[k] for k in sub} for sub in idc_partition]
+
+    lens_ = [[sub_dict[k].shape[1] for k in sub_dict.keys()] for sub_dict in data_batches]
+    #     print(lens_)
+    print(sorted(list(map(sum, lens_))))
 
     datatype = '_'.join(present_columns)
 
@@ -89,10 +111,11 @@ def main(df_type, version, max_size, present_columns, transform_columns, a, b, n
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    # gw
     # version = 8
     # version = 9
 
-    # version = 1
+    # version = 1 for lit
 
     parser.add_argument('-d', '--datasource',
                         default='gw',

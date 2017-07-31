@@ -196,10 +196,14 @@ print('dfi4.shape: {0}'.format(dfi4.shape))
 
 # impute missing ai's with 0.5
 mask = (dfi4[ai].isnull())
-dfi4.loc[mask, ai] = 0.5
-print(sum(mask))
+mean_available_ai = round(dfi4.loc[~mask, ai].mean(), 2)
+print(mean_available_ai)
+print(dfi4[ai].value_counts().head())
+dfi4.loc[mask, ai] = mean_available_ai
+print('{0} ai value imputed, out of {1}. It is {2:.3f}'.format(sum(mask), mask.shape[0], sum(mask)/mask.shape[0]))
 
 dfi5 = dfto.get_multiplet_to_int_index(dfi4, [up, dn], ni)
+print(dfi5[ai].value_counts().head())
 
 dfi6 = dfi5.copy()
 dfi6 = dfi6[[ni, up, dn, at, ye, ai]]
