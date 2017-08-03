@@ -133,7 +133,7 @@ def ks_2samp_multi_dim(sample_a, sample_b):
     return s, p_val
 
 
-def partition_dict(dict_items, ind_start, ind_end, max_size):
+def partition_dict(dict_items, ind_start, ind_end, max_size, how='len'):
     """
 
     :param dict_items: a dict of numpy arrays with equal first dimension
@@ -143,7 +143,9 @@ def partition_dict(dict_items, ind_start, ind_end, max_size):
     :return:
     """
     order_keys = list(dict_items.keys())
-    ordered_weights = array([dict_items[k].shape[1] for k in order_keys])
+    if how == 'len':
+        ordered_weights = array([dict_items[k].shape[1] for k in order_keys])
+
     ordered_data = array([dict_items[k][ind_start:ind_end].T for k in order_keys])
     b, lens_mod, pdfs_mod, inds = bin_packing_ffd_mod(ordered_weights, ordered_data,
                                                       max_size, 0.01, ks_2samp_multi_dim)
