@@ -118,12 +118,17 @@ def plot_hist(arr_list, approx_nbins=10, ylog_axis=False,
 
     :param arr_list:
     :param approx_nbins:
-    :param yrange:
     :param ylog_axis:
     :param xticks_factor:
     :param normed_flag:
     :param opacity:
+    :param linewidth:
     :param fname:
+    :param y_axis_mult:
+    :param title:
+    :param integerize:
+    :param int_xlabels:
+    :param sns_style:
     :return:
     """
     fig = plt.figure(figsize=(6, 6))
