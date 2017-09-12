@@ -158,10 +158,10 @@ def partition_dict(dict_items, ind_start, ind_end, max_size, how='len'):
 def try_moving_element(item_a, item_b, mean_phi_over_weights, sample0,
                        epsilon=0.5, distance_func=ks_2samp):
     # given
-    # weights_a, pdf_a = item_a 
+    # weights_a, pdf_a = item_a
     # weights_b, pdf_b = item_b
     # take one kth element from weights_b, pdf_b in such a way that
-    # la'*sa' is closer mean_phi_over_weights and 
+    # la'*sa' is closer mean_phi_over_weights and
     # distances rho(pdf_a', sample0) and rho(pdf_b', sample0) are improved
 
     # epsilon controls how much importance is given to weight based metric vs pdf metric
@@ -172,36 +172,37 @@ def try_moving_element(item_a, item_b, mean_phi_over_weights, sample0,
         raise ValueError('cardinality of indices, weights and pdfs are not equal')
     len_a, len_b = len(weight_a), len(weight_b)
     sum_a, sum_b = sum(weight_a), sum(weight_b)
-    delta_a, delta_b = abs(len_a * sum_a - mean_phi_over_weights), abs(len_b * sum_b - mean_phi_over_weights)
+    pi_a, pi_b = len_a * sum_a, len_b * sum_b
     da0 = distance_func(concatenate(pdf_a), sample0)[0]
     db0 = distance_func(concatenate(pdf_b), sample0)[0]
-    pdf_dist = []
-    pi_dist = []
-    for j in range(len(weight_b)):
-        # da < da0 - good(!)
-        # db < db0 - good(!)
-        da = distance_func(concatenate([pdf_b[j]] + pdf_a), sample0)[0] - da0
-        db = distance_func(concatenate([pdf_b[k] for k in range(len_b) if k != j]), sample0)[0] - db0
-
-        pa = abs(sum([weight_b[j]] + weight_a) * (len_a + 1) - mean_phi_over_weights)
-        pb = abs(sum([weight_b[k] for k in range(len_b) if k != j]) * (len_b - 1) - mean_phi_over_weights)
-        pi_dist.append(pa + pb)
-        pdf_dist.append((da, db))
-
-    pi_dist_arr = array(pi_dist) / (delta_a + delta_b)
-    pdf_dist_arr = array(pdf_dist)
-    pdf_dist_arr /= abs(pdf_dist_arr.max(axis=0))
-    pdf_dist_arr = abs(pdf_dist_arr)
-
-    # convolved pdf distances
-    pdf_dist_conv = (pdf_dist_arr ** 2).sum(axis=1)
-    distances_normed = (epsilon * pdf_dist_conv + (1. - epsilon) * pi_dist_arr ** 2) ** 0.5
-    i_best = argmin(distances_normed)
-    if pi_dist_arr[i_best] < 1.0 and pdf_dist_conv[i_best] < 1.0:
-        move_flag = True
+    delta_vector = array(weight_b)
+    delta_a = abs(pi_a - mean_phi_over_weights)
+    delta_b = abs(pi_b - mean_phi_over_weights)
+    diff_a = abs(pi_a + sum_a + (len_a+1)*delta_vector - mean_phi_over_weights)/delta_a
+    diff_b = abs(pi_b - sum_b - (len_b-1)*delta_vector - mean_phi_over_weights)/delta_b
+    # conversion to a flat list
+    indices_b = argwhere(((1. - diff_a) > 0) & ((1. - diff_b) > 0)).flatten().tolist()
+    if indices_b:
+        pi_dist = []
+        pdf_dist = []
+        for jb in indices_b:
+            da, _ = distance_func(concatenate([pdf_b[jb]] + pdf_a), sample0)
+            db, _ = distance_func(concatenate([pdf_b[k] for k in range(len_b) if k != jb]), sample0)
+            pi_dist.append((diff_a[jb], diff_b[jb]))
+            pdf_dist.append((da/da0, db/db0))
+        pi_dist_arr = (array(pi_dist)**2).sum(axis=1)
+        pdf_dist_arr = array(pdf_dist)
+        pdf_dist_arr /= abs(pdf_dist_arr.max(axis=0))
+        pdf_dist_arr = abs(pdf_dist_arr)
+        pdf_dist_conv = (pdf_dist_arr ** 2).sum(axis=1)
+        distances_normed = (epsilon * pdf_dist_conv + (1. - epsilon) * pi_dist_arr ** 2) ** 0.5
+        j_best = argmin(distances_normed)
+        swap_flag = True
     else:
-        move_flag = False
-    return move_flag, (None, i_best)
+        swap_flag = False
+        j_best = -1
+
+    return swap_flag, (None, j_best)
 
 
 def try_swapping_elements(item_a, item_b, mean_phi_over_weights, sample0,
@@ -213,7 +214,7 @@ def try_swapping_elements(item_a, item_b, mean_phi_over_weights, sample0,
     weight_a, pdf_a = item_a
     weight_b, pdf_b = item_b
     if not (len(weight_a) == len(pdf_a) and len(weight_b) == len(pdf_b)):
-        raise ValueError('cardinatlity of indices, weights and pdfs are not equal')
+        raise ValueError('cardinality of indices, weights and pdfs are not equal')
     len_a, len_b = len(weight_a), len(weight_b)
     sum_a, sum_b = sum(weight_a), sum(weight_b)
     pi_a, pi_b = len_a * sum_a, len_b * sum_b
@@ -224,37 +225,39 @@ def try_swapping_elements(item_a, item_b, mean_phi_over_weights, sample0,
 
     # a_ij = w^a_i - w^b_j
     delta_matrix = tile(weight_a, (len(weight_b), 1)).T - array(weight_b)
-    diff_a = abs(pi_a - mean_phi_over_weights) - abs(pi_a - len_a*delta_matrix - mean_phi_over_weights)
-    diff_b = abs(pi_b - mean_phi_over_weights) - abs(pi_b + len_b*delta_matrix - mean_phi_over_weights)
-    pairs = argwhere((diff_a > 0) & (diff_b > 0))
-
-    pairs_metric = [(diff_a[x, y] + diff_b[x, y]) for x, y in pairs]
-    pairs_metric_sorted_inds = argsort(pairs_metric)
-    pairs_sorted = [pairs[j] for j in pairs_metric_sorted_inds]
-    swap_flag = False
-    ja, jb = -1, -1
-    # make sure first index is a lower number of items in the bin
-    while pairs_sorted and not swap_flag:
-        ja, jb = pairs_sorted.pop()
-        pdf_a_, pdf_b_ = deepcopy(pdf_a), deepcopy(pdf_b)
-        pdf_a_[ja] = pdf_b[jb]
-        pdf_b_[jb] = pdf_a[ja]
-        da = distance_func(concatenate(pdf_a_), sample0)[0]
-        db = distance_func(concatenate(pdf_b_), sample0)[0]
-
-        # pi_a_prime = (sum_a - weight_a[ia] + weight_b[ib])*len_a
-        # pi_b_prime = (sum_b - weight_b[ib] + weight_a[ia])*len_b
-        # print(pi_b_prime - pi_a_prime, diff_a[ia, ib] + diff_b[ia, ib], weight_a[ia], weight_b[ib])
-        if da < da0 and db < db0:
-            swap_flag = True
-            # print(da, db)
-            # print(da0-da, da, db0-db, db)
-
+    delta_a = abs(pi_a - mean_phi_over_weights)
+    delta_b = abs(pi_b - mean_phi_over_weights)
+    diff_a = abs(pi_a - len_a * delta_matrix - mean_phi_over_weights)/delta_a
+    diff_b = abs(pi_b + len_b * delta_matrix - mean_phi_over_weights)/delta_b
+    pairs = argwhere(((1. - diff_a) > 0) & ((1. - diff_b) > 0))
+    if pairs.any():
+        pi_dist = []
+        pdf_dist = []
+        for ja, jb in pairs:
+            pdf_a_, pdf_b_ = deepcopy(pdf_a), deepcopy(pdf_b)
+            pdf_a_[ja] = pdf_b[jb]
+            pdf_b_[jb] = pdf_a[ja]
+            da = distance_func(concatenate(pdf_a_), sample0)[0]
+            db = distance_func(concatenate(pdf_b_), sample0)[0]
+            # if da < da0 and db < db0 ???
+            pi_dist.append((diff_a[ja, jb], diff_b[ja, jb]))
+            pdf_dist.append((da/da0, db/db0))
+        pi_dist_arr = (array(pi_dist)**2).sum(axis=1)
+        pdf_dist_arr = array(pdf_dist)
+        pdf_dist_arr /= abs(pdf_dist_arr.max(axis=0))
+        pdf_dist_arr = abs(pdf_dist_arr)
+        pdf_dist_conv = (pdf_dist_arr ** 2).sum(axis=1)
+        distances_normed = (epsilon * pdf_dist_conv + (1. - epsilon) * pi_dist_arr ** 2) ** 0.5
+        ja, jb = pairs[argmin(distances_normed)]
+        swap_flag = True
+    else:
+        swap_flag = False
+        ja, jb = -1, -1
     return swap_flag, (ja, jb)
 
 
 def manage_lists(partition_inds, weights, pdfs, sample0, mask_func,
-                 foo=try_moving_element, distance_func=ks_2samp_multi_dim):
+                 foo=try_moving_element, epsilon=0.5, distance_func=ks_2samp_multi_dim):
 
     bins = [[weights[j] for j in ind_batch] for ind_batch in partition_inds]
     pdf_bins = [[pdfs[j] for j in ind_batch] for ind_batch in partition_inds]
@@ -278,7 +281,7 @@ def manage_lists(partition_inds, weights, pdfs, sample0, mask_func,
         index_a, index_b = ps_sorted_inds[ia], ps_sorted_inds[ib]
         bin_a, bin_b = bins[index_a], bins[index_b]
         pdf_a, pdf_b = pdf_bins[index_a], pdf_bins[index_b]
-        accepted, (ja, jb) = foo((bin_a, pdf_a), (bin_b, pdf_b), mean_ps, sample0, 0.5, distance_func)
+        accepted, (ja, jb) = foo((bin_a, pdf_a), (bin_b, pdf_b), mean_ps, sample0, epsilon, distance_func)
         if accepted:
             partition_ind_a, partition_ind_b = list(partition_inds[index_a]), list(partition_inds[index_b])
             if ja:
@@ -286,139 +289,111 @@ def manage_lists(partition_inds, weights, pdfs, sample0, mask_func,
             if jb:
                 partition_ind_b.pop(jb)
             if ja:
-                # partition_ind_b += [partition_inds[index_a][j_a]]
                 partition_ind_b.append(partition_inds[index_a][ja])
             if jb:
-                # partition_ind_a += [partition_inds[index_b][j_b]]
                 partition_ind_a.append(partition_inds[index_b][jb])
-            # print(index_a, index_b)
             pps = [pp for pp in pps if pp[0] != ia and pp[1] != ib and pp[0] != ib and pp[1] != ia]
-            # print(partition_ind_a, partition_inds[index_a])
-            # print(partition_ind_b, partition_inds[index_b])
             partition_inds[index_a] = partition_ind_a
             partition_inds[index_b] = partition_ind_b
     return partition_inds
 
 
-def reshuffle_bins(partition_indices, weights, pdfs, distance_func=ks_2samp):
+def reshuffle_bins(partition_indices, weights, pdfs, epsilon=0.5, distance_func=ks_2samp):
     partition_indices_new = deepcopy(partition_indices)
     sample0 = concatenate(pdfs)
     partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
-                                         lambda x: x > 1, try_moving_element, distance_func)
+                                         lambda x: x >= 1, try_moving_element, epsilon, distance_func)
 
-    print(check_packing(partition_indices_new, weights, pdfs))
-    partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
-                                         lambda x: x == 1, try_moving_element, distance_func)
     print(check_packing(partition_indices_new, weights, pdfs))
 
     partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
-                                         lambda x: x == 1, try_swapping_elements, distance_func)
+                                         lambda x: x < 1, try_swapping_elements, epsilon, distance_func)
     print(check_packing(partition_indices_new, weights, pdfs))
-
-    # ls = list(map(len, bins))
-    # ss = list(map(sum, bins))
-    # ps = list(map(lambda x: x[0] * x[1], zip(ls, ss)))
-
-    # ps_sorted_inds = argsort(ps)
-    # ls_sorted = array(ls)[ps_sorted_inds]
-    # ps_sorted = array(ps)[ps_sorted_inds]
-    # ls_matrix = tile(ls_sorted, (len(ls), 1)).T - ls_sorted
-    # pairs = argwhere(ls_matrix == 1)[:, ::-1]
-    # dd = {k: list(pairs[where(pairs[:, 0] == k)][::-1, 1])
-    #       for k in list(set(pairs[:, 0]))}
-    #
-    # for k in dd:
-    #     print(ps_sorted[k], ps_sorted[dd[k]])
-    #     print(ls_sorted[k], ls_sorted[dd[k]])
 
     return partition_indices_new
 
 
-def bin_packing_mean(weights, pdfs, n, min_batch=3, rescue_size=1, distance_func=ks_2samp,
-                     violation_level_mean=0.1, violation_level_pdf=0.01):
+def bin_packing_mean(weights, pdfs, number_bins, distance_func=ks_2samp):
     w_mean0 = mean(weights)
     sample0 = concatenate(pdfs)
-    items_per_bin = int(ceil(len(weights) / n))
+    items_per_bin = int(ceil(len(weights) / number_bins))
     bin_capacity = (items_per_bin * w_mean0)
     bin_product = bin_capacity * items_per_bin
 
     # descending order
     inds_sorted = argsort(weights)[::-1]
-    inds2 = list(inds_sorted)
-    weights2 = list(weights[inds_sorted])
-    pdfs2 = list(pdfs[inds_sorted])
+    inds2 = [ii for ii in inds_sorted]
+    weights2 = [weights[ii] for ii in inds_sorted]
+    pdfs2 = [pdfs[ii] for ii in inds_sorted]
 
     if max(weights) > bin_capacity:
         raise ValueError('Max item weight is greater than proposed bin cap')
     # populate each bin with a largest available element
-    bins = [[x] for x in weights2[:n]]
-    indices = [[i] for i in inds2[:n]]
-    pdf_bins = [[i] for i in pdfs2[:n]]
+    bins = [[x] for x in weights2[:number_bins]]
+    indices = [[i] for i in inds2[:number_bins]]
+    pdf_bins = [[i] for i in pdfs2[:number_bins]]
 
-    bins_output = []
     indices_output = []
-    pdfs_output = []
-    weights2 = weights2[n:]
-    inds2 = inds2[n:]
-    pdfs2 = pdfs2[n:]
-    ind_cur_bin = 0
-    loop_counter = 0
+    weights2 = weights2[number_bins:]
+    inds2 = inds2[number_bins:]
+    pdfs2 = pdfs2[number_bins:]
 
-    while weights2:
-        add_items_cnt = min([items_per_bin - len(bins[ind_cur_bin]), len(weights2), min_batch])
-        accepted = False
-        cur_bin = bins[ind_cur_bin]
-        cur_ind_bin = indices[ind_cur_bin]
-        cur_pdf_bin = pdf_bins[ind_cur_bin]
-        while not accepted and add_items_cnt > 0:
-            cur_bin_ = list(cur_bin)
-            cur_bin_.extend(weights2[-add_items_cnt:])
-            w_mean = mean(cur_bin)
-            w_proposed = mean(cur_bin_)
-            decision = abs(w_mean - w_mean0) - abs(w_proposed - w_mean0)
-            if decision > -violation_level_mean * std(cur_bin_) and sum(cur_bin_) * len(cur_bin_) < bin_product:
-                ks_cur = distance_func(concatenate(cur_pdf_bin), sample0)
-                ks_cur2 = distance_func(concatenate(cur_pdf_bin + pdfs2[-add_items_cnt:]), sample0)
-                improves_pdf = (ks_cur2[0] < ks_cur[0] + violation_level_pdf)
-                if improves_pdf:
-                    cur_ind_bin.extend(inds2[-add_items_cnt:])
-                    cur_pdf_bin.extend(pdfs2[-add_items_cnt:])
-                    weights2 = weights2[:-add_items_cnt]
-                    inds2 = inds2[:-add_items_cnt]
-                    pdfs2 = pdfs2[:-add_items_cnt]
-                    bins[ind_cur_bin] = cur_bin_
-                    accepted = True
-                    if len(cur_bin_) >= items_per_bin:
-                        bins_output.append(bins.pop(ind_cur_bin))
-                        indices_output.append(indices.pop(ind_cur_bin))
-                        pdfs_output.append(pdf_bins.pop(ind_cur_bin))
-            if not accepted:
-                add_items_cnt -= 1
-        if accepted:
-            loop_counter = 0
+    diffs = [x - y for x, y in zip(weights2[:-1], weights2[1:])]
+    bbs = [0] + [j + 1 for j in range(len(diffs)) if diffs[j] != 0]
+    pdfs3 = [pdfs2[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [pdfs2[bbs[-1]:]]
+    inds3 = [inds2[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [inds2[bbs[-1]:]]
+    weights_uni = [weights2[bbs[i]] for i in range(len(bbs))]
+    j_cur_bin = 0
+    k_cur_weight = 0
+
+    state = -1, -1, -1, -1
+    while weights_uni:
+        ind_bin = indices[j_cur_bin]
+        wei_bin = bins[j_cur_bin]
+        pdf_bin = pdf_bins[j_cur_bin]
+        ind_strata = inds3[k_cur_weight]
+        wei_strata = weights_uni[k_cur_weight]
+        pdf_strata = pdfs3[k_cur_weight]
+
+        pi_tentative = (sum(wei_bin) + wei_strata) * (len(wei_bin) + 1)
+        pi_tentative_min = (sum(wei_bin) + min(weights_uni)) * (len(wei_bin) + 1)
+        if pi_tentative < bin_product:
+            dists = []
+            # bin_mean = mean(wei_bin)
+            # bin_mean_new = (len(wei_bin) * bin_mean + wei_strata) / (len(wei_bin) + 1)
+            # diff_mean = abs(bin_mean_new - w_mean0) / abs(bin_mean - w_mean0)
+            for pdf in pdf_strata:
+                bin_pdf_dist = distance_func(concatenate(pdf_bin), sample0)[0]
+                bin_pdf_dist_new = distance_func(concatenate(pdf_bin + [pdf]), sample0)[0]
+                diff_pdf = bin_pdf_dist_new / bin_pdf_dist
+                dists.append(diff_pdf)
+            pdf_dist_arr = array(dists) ** 2
+            j_best = argmin(pdf_dist_arr)
+            ind_bin.append(ind_strata.pop(j_best))
+            pdf_bin.append(pdf_strata.pop(j_best))
+            wei_bin.append(wei_strata)
+            accepted = True
+            state = j_cur_bin, k_cur_weight, len(bins), len(weights_uni)
         else:
-            loop_counter += 1
-        if loop_counter > len(bins):
-            # rescue plan : place weights[-1] into a bin with least damage
-            candidate = weights2[-rescue_size:]
-            mean_distance = array(list(map(lambda x: abs(mean(x + candidate) - w_mean0), bins)))
-            mean_distance = mean_distance / max(mean_distance)
-            pdf_distance = array(list(map(lambda x:
-                                          distance_func(concatenate(x + pdfs2[-rescue_size:]), sample0)[0], pdf_bins)))
-            pdf_distance = pdf_distance / max(pdf_distance)
-            dist = (pdf_distance ** 2 + mean_distance ** 2) ** 0.5
-            j = argmin(dist)
-            bins[j].extend(candidate)
-            indices[j].extend(inds2[-rescue_size:])
-            pdf_bins[j].extend(pdfs2[-rescue_size:])
-            weights2 = weights2[:-rescue_size]
-            inds2 = inds2[:-rescue_size]
-            pdfs2 = pdfs2[:-rescue_size]
+            accepted = False
+        if not accepted and state == (j_cur_bin, k_cur_weight, len(bins), len(weights_uni)):
+            print('Loop detected')
+            indices.append([ind_strata.pop()])
+            pdf_bins.append([pdf_strata.pop()])
+            bins.append([wei_strata])
+        if not ind_strata:
+            inds3.pop(k_cur_weight)
+            pdfs3.pop(k_cur_weight)
+            weights_uni.pop(k_cur_weight)
+        if pi_tentative_min > bin_product:
+            indices_output.append(indices.pop(j_cur_bin))
+            pdf_bins.pop(j_cur_bin)
+            bins.pop(j_cur_bin)
+        if weights_uni:
+            k_cur_weight = (k_cur_weight + 1) % len(weights_uni)
         if bins:
-            ind_cur_bin = (ind_cur_bin + 1) % len(bins)
-    bins_output.extend(bins)
+            j_cur_bin = (j_cur_bin + 1) % len(bins)
     indices_output.extend(indices)
-    pdfs_output.extend(pdfs)
     return indices_output
 
 
