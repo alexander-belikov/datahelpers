@@ -6,8 +6,7 @@ from sklearn.preprocessing import MinMaxScaler
 import gzip
 import pickle
 from os.path import expanduser
-from datahelpers.sampling import split_to_subsamples
-from datahelpers.partition import partition_dict
+from datahelpers.partition import partition_dict_to_subsamples
 
 ye = 'year'
 up = 'up'
@@ -19,7 +18,8 @@ ps = 'pos'
 ai = 'ai'
 
 
-def main(df_type, version, max_size, present_columns, transform_columns, a, b, n):
+def main(df_type, version, max_size, present_columns, transform_columns,
+         low_freq, hi_freq, low_bound_history_length, n_samples):
 
     with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(df_type, version)), 'rb') as fp:
         df = pickle.load(fp)
@@ -39,7 +39,6 @@ def main(df_type, version, max_size, present_columns, transform_columns, a, b, n
     if ai in present_columns:
         ind_a = present_columns.index('ai')
         ind_b = present_columns.index('ai') + 1
-        # ind_b = present_columns.index('aihi') + 1
     else:
         ind_b = len(present_columns)
         ind_a = ind_b - 1
@@ -49,8 +48,10 @@ def main(df_type, version, max_size, present_columns, transform_columns, a, b, n
 
     dft = df[[ni] + present_columns].copy()
 
-    ids = extract_idc_within_frequency_interval(dft, ni, ps, (a, b), n)
+    ids = extract_idc_within_frequency_interval(dft, ni, ps, (low_freq, hi_freq),
+                                                low_bound_history_length)
     print('number of unique ids : {0}'.format(len(ids)))
+    print('feature indices : {0} {1}'.format(ind_a, ind_b))
 
     mask_ids = df[ni].isin(ids)
     means = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].mean())
@@ -65,7 +66,8 @@ def main(df_type, version, max_size, present_columns, transform_columns, a, b, n
     df_stats = pd.merge(df_uniques, means_lens, right_index=True, left_on=ni).sort_values(['len'], ascending=False)
 
     df_stats.to_csv(expanduser('~/data/kl/claims/pairs_freq_{0}_v_{1}_n_{2}'
-                               '_a_{3}_b_{4}.csv.gz'.format(df_type, version, n, a, b)),
+                               '_a_{3}_b_{4}.csv.gz'.format(df_type, version,
+                                                            low_bound_history_length, low_freq, hi_freq)),
                     compression='gzip', index=False)
 
     data_dict = {str(idc): dft.loc[dft[ni].isin([idc]), present_columns].values.T[:] for idc in ids}
@@ -79,33 +81,24 @@ def main(df_type, version, max_size, present_columns, transform_columns, a, b, n
                 d2[index] = np.squeeze(sc.fit_transform(d[index].reshape(-1, 1)))
                 data_dict2[k] = d2
 
-    # metric_dict = {k: v.shape[1] for k, v in data_dict2.items()}
-    # idc_partition = split_to_subsamples(metric_dict, size=max_size)
-
-    # calculate optimal bin size
-    # allow 1 - fraction_full to be empty
-    # bin_size optimal in the sense that for an optimal-like solution
-    # there will no half full bins
-
     total_size = sum(map(lambda x: x.shape[1], data_dict2.values()))
-    fraction_full = 0.95
+    print('total size: {0}'.format(total_size))
+    partition_dict = {k: data_dict2[k][ind_a:ind_b].T for k in data_dict2.keys()}
 
-    bin_size = round(total_size / round(total_size / max_size) / fraction_full, -1)
+    idc_partition = partition_dict_to_subsamples(partition_dict, n_samples)
 
-    idc_partition = partition_dict(data_dict2, ind_a, ind_b, bin_size)
-
-    print('number of batches in partion: {0}; total size {1}'.format(idc_partition, total_size))
+    print('number of batches in partition {0}; number of subsamples {1}'.format(idc_partition, n_samples))
     data_batches = [{k: data_dict2[k] for k in sub} for sub in idc_partition]
+    print('the actual number of subsamples {0}'.format(len(data_batches)))
 
     lens_ = [[sub_dict[k].shape[1] for k in sub_dict.keys()] for sub_dict in data_batches]
-    #     print(lens_)
     print(sorted(list(map(sum, lens_))))
 
     datatype = '_'.join(present_columns)
 
     with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}_c_{2}_m_{3}_'
                               'n_{4}_a_{5}_b_{6}.pgz'.format(df_type, version, datatype, max_size,
-                                                             n, a, b)), 'wb') as fp:
+                                                             low_bound_history_length, low_freq, hi_freq)), 'wb') as fp:
         pickle.dump(data_batches, fp)
 
 if __name__ == "__main__":
@@ -129,7 +122,7 @@ if __name__ == "__main__":
                         default=1000, type=int,
                         help='size of data batches')
 
-    parser.add_argument('-n', '--maxsize-sequence',
+    parser.add_argument('-n', '--minsize-sequence',
                         default=20, type=int,
                         help='version of data source')
 
@@ -137,19 +130,15 @@ if __name__ == "__main__":
                         nargs='+', default=[0.1, 0.9], type=float,
                         help='define interval of observed freqs for sequence consideration')
 
-    # parser.add_argument('-d', '--destpath', default='.',
-    #                     help='Folder to write data to, Default is current folder')
-
     parser.add_argument('--data-columns', nargs='*', default=['year', 'identity', 'ai', 'pos'])
 
     parser.add_argument('--transform-columns', nargs='*', default=['year'])
 
     args = parser.parse_args()
-
     print(args._get_kwargs())
 
-    a, b = args.partition_sequence
-    n = args.maxsize_sequence
+    low_f, hi_f = args.partition_sequence
+    min_size_history = args.minsize_sequence
 
     main(args.datasource, args.version, args.batchsize, args.data_columns,
-         args.transform_columns, a, b, n)
+         args.transform_columns, low_f, hi_f, min_size_history)
