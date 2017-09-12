@@ -3,10 +3,10 @@ from numpy import zeros, arange, array, concatenate, \
 from scipy.stats import ks_2samp
 from copy import deepcopy
 
-#TODO what if there exist a weight >= max_weight?
+
 def knap(weights, max_weight):
     """
-    knap is a solver to a modified knapsack 0/1 problem
+    knap is a solver to a modified knapsack 0/1 problem via DP
     obejctive: take subset from lengths such that sum x_i < max_len
     :param weights: list of ints
     :param max_weight: maximum weight
@@ -37,6 +37,7 @@ def knap(weights, max_weight):
 
 def partition(weights, max_weight):
     """
+    solve bin packing via knapsack
     partition weights into a list of lists
     each satisfying condition sum x_i < max_len
     :param weights:
@@ -56,7 +57,7 @@ def partition(weights, max_weight):
 
 def bin_packing_ffd_mod(weights, pdfs, max_size, violation_level=0., distance_func=ks_2samp):
     """
-
+    bin packing according to weights and pdf distance
     :param weights:
     :param pdfs:
     :param max_size:
@@ -69,8 +70,6 @@ def bin_packing_ffd_mod(weights, pdfs, max_size, violation_level=0., distance_fu
     inds2 = list(inds_sorted)
     weights2 = list(weights[inds_sorted])
     pdfs2 = list(pdfs[inds_sorted])
-    bins = [[]]
-    r_pdfs = [[]]
     ind_cur_bin = 0
     if weights2[0] > max_size:
         raise ValueError('Max item weight is greater than proposed bin cap')
@@ -97,7 +96,6 @@ def bin_packing_ffd_mod(weights, pdfs, max_size, violation_level=0., distance_fu
             if cur_pdf_bin:
                 ks_cur = distance_func(concatenate(cur_pdf_bin), sample0)
                 ks_cur2 = distance_func(concatenate(cur_pdf_bin + [pdfs2[ind_cur_ssample]]), sample0)
-                # print(sample0.shape, ks_cur, ks_cur2)
                 improves_pdf = (ks_cur2[0] < ks_cur[0] + violation_level)
             if max_size - sum(cur_bin) >= weights2[ind_cur_ssample] and improves_pdf:
                 cur_bin.append(weights2.pop(ind_cur_ssample))
@@ -126,6 +124,12 @@ def bin_packing_ffd_mod(weights, pdfs, max_size, violation_level=0., distance_fu
 
 
 def ks_2samp_multi_dim(sample_a, sample_b):
+    """
+    compute distance between two k-dim samples
+    :param sample_a:
+    :param sample_b:
+    :return:
+    """
     # p_val is not additive
     s = 0
     for x, y in zip(sample_a.T, sample_b.T):
@@ -135,37 +139,47 @@ def ks_2samp_multi_dim(sample_a, sample_b):
     return s, p_val
 
 
-def partition_dict(dict_items, ind_start, ind_end, max_size, how='len'):
+def partition_dict_to_subsamples(dict_items, number_of_bins):
     """
 
     :param dict_items: a dict of numpy arrays with equal first dimension
     :param ind_start: index of first ar
     :param ind_end:
-    :param max_size:
+    :param number_of_bins: tentative number of bins
     :return:
     """
     order_keys = list(dict_items.keys())
-    if how == 'len':
-        ordered_weights = array([dict_items[k].shape[1] for k in order_keys])
-
-    ordered_data = array([dict_items[k][ind_start:ind_end].T for k in order_keys])
-    print('sizes of weights and data lists : {0} {1}'.format(len(ordered_weights), len(ordered_data)))
-    b, lens_mod, pdfs_mod, inds = bin_packing_ffd_mod(ordered_weights, ordered_data, max_size, 0.01, ks_2samp_multi_dim)
-    split_keys = [[order_keys[j] for j in ind_batch] for ind_batch in inds]
+    ordered_data = [dict_items[k] for k in order_keys]
+    iis = bin_packing_mean(ordered_data, number_of_bins, distance_func=ks_2samp_multi_dim)
+    iis2 = reshuffle_bins(iis, ordered_data, 0.5, ks_2samp_multi_dim)
+    split_keys = [[order_keys[j] for j in ind_batch] for ind_batch in iis2]
     return split_keys
 
 
 def try_moving_element(item_a, item_b, mean_phi_over_weights, sample0,
                        epsilon=0.5, distance_func=ks_2samp):
-    # given
-    # weights_a, pdf_a = item_a
-    # weights_b, pdf_b = item_b
-    # take one kth element from weights_b, pdf_b in such a way that
-    # la'*sa' is closer mean_phi_over_weights and
-    # distances rho(pdf_a', sample0) and rho(pdf_b', sample0) are improved
+    """
+    try moving elements from item_b to item_a to decrease pdf distance and make weight metrics more similar
+    :param item_a: weights_a, pdf_a
+    :param item_b: weights_b, pdf_b
+    :param mean_phi_over_weights:
+    :param sample0:
+    :param epsilon:
+    :param distance_func:
+    :return:
 
-    # epsilon controls how much importance is given to weight based metric vs pdf metric
-    # epsilon = 1 only pdf metric; epsilon = 0 only weight based metric
+    given
+    weights_a, pdf_a = item_a
+    weights_b, pdf_b = item_b
+    take one kth element from weights_b, pdf_b in such a way that
+    la'*sa' is closer mean_phi_over_weights and
+    distances rho(pdf_a', sample0) and rho(pdf_b', sample0) are improved
+
+    epsilon controls how much importance is given to weight based metric vs pdf metric
+    epsilon = 1 only pdf metric; epsilon = 0 only weight based metric
+
+    """
+
     weight_a, pdf_a = item_a
     weight_b, pdf_b = item_b
     if not (len(weight_a) == len(pdf_a) and len(weight_b) == len(pdf_b)):
@@ -207,10 +221,20 @@ def try_moving_element(item_a, item_b, mean_phi_over_weights, sample0,
 
 def try_swapping_elements(item_a, item_b, mean_phi_over_weights, sample0,
                           epsilon=0.5, distance_func=ks_2samp):
-    # swap ith and jth elements from pdf_a and pdf_b and w_a and w_b
+    """
+    try swapping elements between item_a and item_b to decrease pdf distance and make weight metrics more similar
 
-    # epsilon controls how much importance is given to weight based metric vs pdf metric
-    # epsilon = 1 only pdf metric; epsilon = 0 only weight based metric
+    :param item_a: weight_a, pdf_a
+    :param item_b: weight_b, pdf_b
+    :param mean_phi_over_weights:
+    :param sample0:
+    :param epsilon:
+    :param distance_func:
+    :return: sawp_flag, (index of item_a element, index of item_b element)
+    epsilon controls how much importance is given to weight based metric vs pdf metric
+    epsilon = 1 only pdf metric; epsilon = 0 only weight based metric
+    """
+
     weight_a, pdf_a = item_a
     weight_b, pdf_b = item_b
     if not (len(weight_a) == len(pdf_a) and len(weight_b) == len(pdf_b)):
@@ -218,8 +242,6 @@ def try_swapping_elements(item_a, item_b, mean_phi_over_weights, sample0,
     len_a, len_b = len(weight_a), len(weight_b)
     sum_a, sum_b = sum(weight_a), sum(weight_b)
     pi_a, pi_b = len_a * sum_a, len_b * sum_b
-    # how far pa and pb from the mean
-    # delta_a, delta_b = pi_a - mean_phi_over_weights, pi_b - mean_phi_over_weights
     da0 = distance_func(concatenate(pdf_a), sample0)[0]
     db0 = distance_func(concatenate(pdf_b), sample0)[0]
 
@@ -239,7 +261,6 @@ def try_swapping_elements(item_a, item_b, mean_phi_over_weights, sample0,
             pdf_b_[jb] = pdf_a[ja]
             da = distance_func(concatenate(pdf_a_), sample0)[0]
             db = distance_func(concatenate(pdf_b_), sample0)[0]
-            # if da < da0 and db < db0 ???
             pi_dist.append((diff_a[ja, jb], diff_b[ja, jb]))
             pdf_dist.append((da/da0, db/db0))
         pi_dist_arr = (array(pi_dist)**2).sum(axis=1)
@@ -258,6 +279,18 @@ def try_swapping_elements(item_a, item_b, mean_phi_over_weights, sample0,
 
 def manage_lists(partition_inds, weights, pdfs, sample0, mask_func,
                  foo=try_moving_element, epsilon=0.5, distance_func=ks_2samp_multi_dim):
+    """
+    arrange items from partition, to apply foo (to move or swap elements from items)
+    :param partition_inds:
+    :param weights:
+    :param pdfs:
+    :param sample0:
+    :param mask_func:
+    :param foo:
+    :param epsilon:
+    :param distance_func:
+    :return:
+    """
 
     bins = [[weights[j] for j in ind_batch] for ind_batch in partition_inds]
     pdf_bins = [[pdfs[j] for j in ind_batch] for ind_batch in partition_inds]
@@ -298,9 +331,19 @@ def manage_lists(partition_inds, weights, pdfs, sample0, mask_func,
     return partition_inds
 
 
-def reshuffle_bins(partition_indices, weights, pdfs, epsilon=0.5, distance_func=ks_2samp):
+def reshuffle_bins(partition_indices, pdfs, epsilon=0.5, distance_func=ks_2samp):
+    """
+    try to rearrange items given partion (move and swap)
+    :param partition_indices:
+    :param pdfs:
+    :param epsilon:
+    :param distance_func:
+    :return:
+    """
     partition_indices_new = deepcopy(partition_indices)
     sample0 = concatenate(pdfs)
+    weights = [d.shape[0] for d in pdfs]
+    print(check_packing(partition_indices_new, weights, pdfs))
     partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
                                          lambda x: x >= 1, try_moving_element, epsilon, distance_func)
 
@@ -314,6 +357,14 @@ def reshuffle_bins(partition_indices, weights, pdfs, epsilon=0.5, distance_func=
 
 
 def bin_packing_mean(pdfs_input, number_bins, distance_func=ks_2samp):
+    """
+    partition list of numpy arrays pdfs_input into a list of lists
+
+    :param pdfs_input:
+    :param number_bins: tentative number of bins
+    :param distance_func: sample distance func
+    :return:
+    """
 
     # descending order in size and in std
     inds = [x[0] for x in sorted(enumerate(pdfs_input),
@@ -396,6 +447,14 @@ def bin_packing_mean(pdfs_input, number_bins, distance_func=ks_2samp):
 
 
 def check_packing(list_indices, weights, pdfs, distance_func=ks_2samp_multi_dim):
+    """
+    return stats of the partition
+    :param list_indices:
+    :param weights:
+    :param pdfs:
+    :param distance_func:
+    :return:
+    """
     if not (sum(list(map(len, list_indices))) == len(weights) and len(weights) == len(pdfs)):
         raise ValueError('cardinality of indices, weights and pdfs are not equal')
 
@@ -410,3 +469,27 @@ def check_packing(list_indices, weights, pdfs, distance_func=ks_2samp_multi_dim)
     std_ps = std(ps)
     rhos = list(map(lambda x: distance_func(concatenate(x), sample0)[0], pdf_bins))
     return mean_ps, std_ps, min(rhos), max(rhos)
+
+
+# old material beyond this point
+
+def partition_dict(dict_items, max_size, how='len'):
+    """
+    return keys of partition of dict of numpy array into groups of at most max size
+
+    :param dict_items: a dict of numpy arrays with equal first dimension
+    :param ind_start: index of first ar
+    :param ind_end:
+    :param max_size:
+    :return:
+    """
+    order_keys = list(dict_items.keys())
+    if how == 'len':
+        ordered_weights = array([dict_items[k].shape[1] for k in order_keys])
+
+    ordered_data = array([dict_items[k].T for k in order_keys])
+    print('sizes of weights and data lists : {0} {1}'.format(len(ordered_weights), len(ordered_data)))
+    b, lens_mod, pdfs_mod, inds = bin_packing_ffd_mod(ordered_weights, ordered_data, max_size, 0.01, ks_2samp_multi_dim)
+    split_keys = [[order_keys[j] for j in ind_batch] for ind_batch in inds]
+    return split_keys
+
