@@ -343,15 +343,18 @@ def reshuffle_bins(partition_indices, pdfs, epsilon=0.5, distance_func=ks_2samp)
     partition_indices_new = deepcopy(partition_indices)
     sample0 = concatenate(pdfs)
     weights = [d.shape[0] for d in pdfs]
-    print(check_packing(partition_indices_new, weights, pdfs))
+    report = check_packing(partition_indices_new, weights, pdfs)
+    print(report, report[0/report[1]])
     partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
                                          lambda x: x >= 1, try_moving_element, epsilon, distance_func)
 
-    print(check_packing(partition_indices_new, weights, pdfs))
+    report = check_packing(partition_indices_new, weights, pdfs)
+    print(report, report[0/report[1]])
 
     partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
                                          lambda x: x < 1, try_swapping_elements, epsilon, distance_func)
-    print(check_packing(partition_indices_new, weights, pdfs))
+    report = check_packing(partition_indices_new, weights, pdfs)
+    print(report, report[0/report[1]])
 
     return partition_indices_new
 
@@ -481,6 +484,7 @@ def partition_dict(dict_items, max_size, how='len'):
     :param ind_start: index of first ar
     :param ind_end:
     :param max_size:
+    :param how
     :return:
     """
     order_keys = list(dict_items.keys())

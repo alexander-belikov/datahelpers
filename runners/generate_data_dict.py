@@ -18,7 +18,7 @@ ps = 'pos'
 ai = 'ai'
 
 
-def main(df_type, version, max_size, present_columns, transform_columns,
+def main(df_type, version, present_columns, transform_columns,
          low_freq, hi_freq, low_bound_history_length, n_samples):
 
     with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(df_type, version)), 'rb') as fp:
@@ -97,7 +97,7 @@ def main(df_type, version, max_size, present_columns, transform_columns,
     datatype = '_'.join(present_columns)
 
     with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}_c_{2}_m_{3}_'
-                              'n_{4}_a_{5}_b_{6}.pgz'.format(df_type, version, datatype, max_size,
+                              'n_{4}_a_{5}_b_{6}.pgz'.format(df_type, version, datatype, n_samples,
                                                              low_bound_history_length, low_freq, hi_freq)), 'wb') as fp:
         pickle.dump(data_batches, fp)
 
@@ -118,8 +118,8 @@ if __name__ == "__main__":
                         default=8, type=int,
                         help='version of data source')
 
-    parser.add_argument('-s', '--batchsize',
-                        default=1000, type=int,
+    parser.add_argument('-s', '--nsamples',
+                        default=8, type=int,
                         help='size of data batches')
 
     parser.add_argument('-n', '--minsize-sequence',
@@ -140,5 +140,5 @@ if __name__ == "__main__":
     low_f, hi_f = args.partition_sequence
     min_size_history = args.minsize_sequence
 
-    main(args.datasource, args.version, args.batchsize, args.data_columns,
-         args.transform_columns, low_f, hi_f, min_size_history)
+    main(args.datasource, args.version, args.data_columns, args.transform_columns,
+         low_f, hi_f, min_size_history, args.nsamples)
