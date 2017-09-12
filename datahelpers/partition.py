@@ -313,36 +313,38 @@ def reshuffle_bins(partition_indices, weights, pdfs, epsilon=0.5, distance_func=
     return partition_indices_new
 
 
-def bin_packing_mean(weights, pdfs, number_bins, distance_func=ks_2samp):
+def bin_packing_mean(pdfs_input, number_bins, distance_func=ks_2samp):
+
+    # descending order in size and in std
+    inds = [x[0] for x in sorted(enumerate(pdfs_input),
+                                 key=lambda y: (y[1].shape[0], y[1].std()), reverse=True)]
+
+    weights = [pdfs_input[ii].shape[0] for ii in inds]
+    pdfs = [pdfs_input[ii] for ii in inds]
+
     w_mean0 = mean(weights)
-    sample0 = concatenate(pdfs)
+    sample0 = concatenate(pdfs_input)
     items_per_bin = int(ceil(len(weights) / number_bins))
     bin_capacity = (items_per_bin * w_mean0)
     bin_product = bin_capacity * items_per_bin
 
-    # descending order
-    inds_sorted = argsort(weights)[::-1]
-    inds2 = [ii for ii in inds_sorted]
-    weights2 = [weights[ii] for ii in inds_sorted]
-    pdfs2 = [pdfs[ii] for ii in inds_sorted]
-
     if max(weights) > bin_capacity:
         raise ValueError('Max item weight is greater than proposed bin cap')
     # populate each bin with a largest available element
-    bins = [[x] for x in weights2[:number_bins]]
-    indices = [[i] for i in inds2[:number_bins]]
-    pdf_bins = [[i] for i in pdfs2[:number_bins]]
+    bins = [[x] for x in weights[:number_bins]]
+    indices = [[i] for i in inds[:number_bins]]
+    pdf_bins = [[i] for i in pdfs[:number_bins]]
 
     indices_output = []
-    weights2 = weights2[number_bins:]
-    inds2 = inds2[number_bins:]
-    pdfs2 = pdfs2[number_bins:]
+    weights = weights[number_bins:]
+    inds = inds[number_bins:]
+    pdfs = pdfs[number_bins:]
 
-    diffs = [x - y for x, y in zip(weights2[:-1], weights2[1:])]
+    diffs = [x - y for x, y in zip(weights[:-1], weights[1:])]
     bbs = [0] + [j + 1 for j in range(len(diffs)) if diffs[j] != 0]
-    pdfs3 = [pdfs2[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [pdfs2[bbs[-1]:]]
-    inds3 = [inds2[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [inds2[bbs[-1]:]]
-    weights_uni = [weights2[bbs[i]] for i in range(len(bbs))]
+    pdfs2 = [pdfs[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [pdfs[bbs[-1]:]]
+    inds2 = [inds[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [inds[bbs[-1]:]]
+    weights_uni = [weights[bbs[i]] for i in range(len(bbs))]
     j_cur_bin = 0
     k_cur_weight = 0
 
@@ -351,24 +353,20 @@ def bin_packing_mean(weights, pdfs, number_bins, distance_func=ks_2samp):
         ind_bin = indices[j_cur_bin]
         wei_bin = bins[j_cur_bin]
         pdf_bin = pdf_bins[j_cur_bin]
-        ind_strata = inds3[k_cur_weight]
+        ind_strata = inds2[k_cur_weight]
         wei_strata = weights_uni[k_cur_weight]
-        pdf_strata = pdfs3[k_cur_weight]
+        pdf_strata = pdfs2[k_cur_weight]
 
         pi_tentative = (sum(wei_bin) + wei_strata) * (len(wei_bin) + 1)
         pi_tentative_min = (sum(wei_bin) + min(weights_uni)) * (len(wei_bin) + 1)
         if pi_tentative < bin_product:
             dists = []
-            # bin_mean = mean(wei_bin)
-            # bin_mean_new = (len(wei_bin) * bin_mean + wei_strata) / (len(wei_bin) + 1)
-            # diff_mean = abs(bin_mean_new - w_mean0) / abs(bin_mean - w_mean0)
             for pdf in pdf_strata:
                 bin_pdf_dist = distance_func(concatenate(pdf_bin), sample0)[0]
                 bin_pdf_dist_new = distance_func(concatenate(pdf_bin + [pdf]), sample0)[0]
                 diff_pdf = bin_pdf_dist_new / bin_pdf_dist
                 dists.append(diff_pdf)
-            pdf_dist_arr = array(dists) ** 2
-            j_best = argmin(pdf_dist_arr)
+            j_best = argmin(array(dists) ** 2)
             ind_bin.append(ind_strata.pop(j_best))
             pdf_bin.append(pdf_strata.pop(j_best))
             wei_bin.append(wei_strata)
@@ -382,8 +380,8 @@ def bin_packing_mean(weights, pdfs, number_bins, distance_func=ks_2samp):
             pdf_bins.append([pdf_strata.pop()])
             bins.append([wei_strata])
         if not ind_strata:
-            inds3.pop(k_cur_weight)
-            pdfs3.pop(k_cur_weight)
+            inds2.pop(k_cur_weight)
+            pdfs2.pop(k_cur_weight)
             weights_uni.pop(k_cur_weight)
         if pi_tentative_min > bin_product:
             indices_output.append(indices.pop(j_cur_bin))
