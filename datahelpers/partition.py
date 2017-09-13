@@ -343,18 +343,19 @@ def reshuffle_bins(partition_indices, pdfs, epsilon=0.5, distance_func=ks_2samp)
     partition_indices_new = deepcopy(partition_indices)
     sample0 = concatenate(pdfs)
     weights = [d.shape[0] for d in pdfs]
-    report = check_packing(partition_indices_new, weights, pdfs)
-    print(report, report[0/report[1]])
-    partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
-                                         lambda x: x >= 1, try_moving_element, epsilon, distance_func)
 
     report = check_packing(partition_indices_new, weights, pdfs)
-    print(report, report[0/report[1]])
+    print(report, '; std/mean = {0}'.format(report[1]/report[0]))
+
+    partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
+                                         lambda x: x >= 1, try_moving_element, epsilon, distance_func)
+    report = check_packing(partition_indices_new, weights, pdfs)
+    print(report, '; std/mean = {0}'.format(report[1]/report[0]))
 
     partition_indices_new = manage_lists(partition_indices_new, weights, pdfs, sample0,
                                          lambda x: x < 1, try_swapping_elements, epsilon, distance_func)
     report = check_packing(partition_indices_new, weights, pdfs)
-    print(report, report[0/report[1]])
+    print(report, '; std/mean = {0}'.format(report[1]/report[0]))
 
     return partition_indices_new
 

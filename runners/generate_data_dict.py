@@ -92,7 +92,9 @@ def main(df_type, version, present_columns, transform_columns,
     print('the actual number of subsamples {0}'.format(len(data_batches)))
 
     lens_ = [[sub_dict[k].shape[1] for k in sub_dict.keys()] for sub_dict in data_batches]
-    print(sorted(list(map(sum, lens_))))
+    print('sums: :{0}'.format(sorted(list(map(sum, lens_)))))
+    print('products {0}'.format(sorted(list(map(lambda x: sum(x)*len(x), lens_)))))
+    print('products {0}'.format(sorted(list(map(lambda x: sum(x)*(len(x)+1), lens_)))))
 
     datatype = '_'.join(present_columns)
 
