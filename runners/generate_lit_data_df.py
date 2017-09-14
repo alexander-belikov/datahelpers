@@ -85,7 +85,6 @@ df.rename(columns={'PMID': pm}, inplace=True)
 
 # to save pmids so that years and issn could be pulled later
 pmids = df[pm].drop_duplicates()
-pmids2 = pd.DataFrame(pmids.values, index=pmids.index, columns=[pm]).reset_index()
 
 # cut out complexes '_', work with families '|'
 mcut = (df['Theme'].str.contains('_')) | (df['Cause'].str.contains('_'))
@@ -109,7 +108,7 @@ p, q = unfold_df(df_tmp)
 dfs = pd.DataFrame(q, columns=(['index'] + list(p)))
 print(dfs.shape)
 dfi2 = pd.merge(dfs, pd.DataFrame(df[pm]), left_on='index', right_index=True)
-print(dfi2.shape)
+print('after pmid remerge:', dfi2.shape)
 
 # convert symbols to entrez id
 gc = bgc.GeneIdConverter(expanduser('~/data/chebi/hgnc_complete_set.json.gz'), bgc.types, bgc.enforce_ints)
@@ -140,10 +139,10 @@ df_pmid = df_pmid.loc[~df_pmid['year'].isnull()]
 df_pmid['year'] = df_pmid['year'].astype(int)
 
 # merge literome pmids to
-pmids3 = pd.merge(pmids2, df_pmid, how='inner', on=pm)
+pmids2 = pd.merge(pd.DataFrame(pmids, columns=[pm]), df_pmid, how='inner', on=pm)
 
 # merge (pm-issn) onto (claims)
-dfi3 = pd.merge(dfi2, pmids3[['index', 'issn', 'year']], on='index', how='left')
+dfi3 = pd.merge(dfi2, pmids2[[pm, 'issn', 'year']], on=pm, how='left')
 print('dfi3.shape: {0}'.format(dfi3.shape))
 
 dfi3 = dfi3.loc[~dfi3[ye].isnull()].copy()
@@ -208,5 +207,5 @@ print(dfi5[ai].value_counts().head())
 dfi6 = dfi5.copy()
 dfi6 = dfi6[[ni, up, dn, at, ye, ai]]
 
-with gzip.open(expanduser('~/data/kl/claims/df_lit_5.pgz'), 'wb') as fp:
+with gzip.open(expanduser('~/data/kl/claims/df_lit_6.pgz'), 'wb') as fp:
     pickle.dump(dfi6, fp)
