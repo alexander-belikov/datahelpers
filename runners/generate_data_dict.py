@@ -54,16 +54,15 @@ def main(df_type, version, present_columns, transform_columns,
     print('feature indices : {0} {1}'.format(ind_a, ind_b))
 
     mask_ids = df[ni].isin(ids)
-    means = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].mean())
-    sizes = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].shape[0])
+    up_dn = df.loc[mask_ids, [up, dn, ni]].drop_duplicates(ni).set_index(ni)
+    means = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].mean()).rename('mean')
+    sizes = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].shape[0]).rename('len')
+    max_ye = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ye].max()).rename('max_year')
+    min_ye = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ye].min()).rename('min_year')
+    diff_ye = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ye].max() - x[ye].min()).rename('delta_year')
 
-    df_uniques = df.loc[mask_ids, [up, dn, ni]].drop_duplicates(ni)
-    print(df_uniques.shape, len(df_uniques[ni].unique()))
-
-    means_lens = pd.merge(pd.DataFrame(means, columns=['mean']), pd.DataFrame(sizes, columns=['len']),
-                          left_index=True, right_index=True)
-
-    df_stats = pd.merge(df_uniques, means_lens, right_index=True, left_on=ni).sort_values(['len'], ascending=False)
+    df_stats = pd.concat([up_dn, means, sizes, max_ye, min_ye, diff_ye], axis=1).reset_index()
+    df_stats = df_stats.reindex(columns=df_stats.columns[[1, 2, 0, 3, 4, 5, 6, 7]])
 
     df_stats.to_csv(expanduser('~/data/kl/claims/pairs_freq_{0}_v_{1}_n_{2}'
                                '_a_{3}_b_{4}.csv.gz'.format(df_type, version,
@@ -92,9 +91,10 @@ def main(df_type, version, present_columns, transform_columns,
     print('the actual number of subsamples {0}'.format(len(data_batches)))
 
     lens_ = [[sub_dict[k].shape[1] for k in sub_dict.keys()] for sub_dict in data_batches]
+    print('lens: :{0}'.format(sorted(list(map(len, lens_)))))
     print('sums: :{0}'.format(sorted(list(map(sum, lens_)))))
     print('products {0}'.format(sorted(list(map(lambda x: sum(x)*len(x), lens_)))))
-    print('products {0}'.format(sorted(list(map(lambda x: sum(x)*(len(x)+1), lens_)))))
+    print('products(+1) {0}'.format(sorted(list(map(lambda x: sum(x)*(len(x)+1), lens_)))))
 
     datatype = '_'.join(present_columns)
 

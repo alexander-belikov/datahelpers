@@ -53,7 +53,8 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
     # drop (ni, pm) duplicates
     # only max value of col remain from duplicates
     maskt = (dft[col] == 'NULL')
-    print('fraction of claims with missing precision dropped: {0:.4f}'.format(float(sum(m)) / m.shape[0]))
+    print('fraction of claims with missing '
+          'precision dropped: {0:.4f}'.format(float(sum(maskt)) / maskt.shape[0]))
     dft2 = dft.loc[~maskt].copy()
     dft2[col] = dft2[col].astype(float)
     dft2 = dft2.reset_index(drop=True)

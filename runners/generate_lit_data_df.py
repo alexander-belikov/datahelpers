@@ -53,13 +53,13 @@ def find_closest_year(x, years):
         return years[left]
 
 
-def drop_duplicates_cols_arrange_col(df, columns, col):
+def drop_duplicates_cols_arrange_col(dft, columns, col):
     # drop rows with col == 'NULL'
     # drop (ni, pm) duplicates
     # only max value of col remain from duplicates
-    m = (df[col] == 'NULL')
+    maskt = (dft[col] == 'NULL')
     print('fraction of claims with missing precision dropped: {0:.4f}'.format(float(sum(m)) / m.shape[0]))
-    df2 = df.loc[~m].copy()
+    df2 = dft.loc[~maskt].copy()
     df2[col] = df2[col].astype(float)
     df2 = df2.reset_index(drop=True)
     idx = df2.groupby(columns)[col].idxmax()
