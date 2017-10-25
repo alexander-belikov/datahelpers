@@ -113,7 +113,7 @@ def plot_hist_float_x(data, xranges, yranges=None, N=10, opacity=0.8, ylog_axis=
 def plot_hist(arr_list, approx_nbins=10, ylog_axis=False,
               xticks_factor=1, normed_flag=False, opacity=0.5, linewidth=2,
               fname=None, y_axis_mult=None, title='', integerize=False,
-              int_xlabels=True, sns_style='darkgrid'):
+              xlabels_style='int', sns_style='darkgrid'):
     """
 
     :param arr_list:
@@ -127,7 +127,7 @@ def plot_hist(arr_list, approx_nbins=10, ylog_axis=False,
     :param y_axis_mult:
     :param title:
     :param integerize:
-    :param int_xlabels:
+    :param xlabels_style: 'int', 'sci' or 'float'
     :param sns_style:
     :return:
     """
@@ -139,22 +139,25 @@ def plot_hist(arr_list, approx_nbins=10, ylog_axis=False,
     mins = [min(d) for d in arr_list]
     maxs = [max(d) for d in arr_list]
     if integerize:
-        min_data = int(min(mins))
-        max_data = int(max(maxs))
+        min_data = floor(min(mins))
+        max_data = ceil(max(maxs))
     else:
         min_data = min(mins)
         max_data = max(maxs)
 
+    print(min_data, max_data)
     delta_x = find_intlike_delta(min_data, max_data, approx_nbins)
     print(min_data, max_data, delta_x)
     x_bins = np.arange(min_data, max_data + 2*delta_x, delta_x)
     print(x_bins)
     x_ticks = np.arange(min_data, max_data + 3*delta_x, delta_x)
     x_ticks = x_ticks[::xticks_factor]
-    if int_xlabels:
+    if xlabels_style == 'int':
         x_labels = [str(int(t)) for t in x_ticks]
-    else:
-        x_labels = ['{0:.2e}'.format(t) for t in x_ticks]
+    elif xlabels_style == 'sci':
+        x_labels = ['{0:.1e}'.format(t) for t in x_ticks]
+    elif xlabels_style == 'float':
+        x_labels = ['{0:.1f}'.format(t) for t in x_ticks]
 
     xrange = [min_data, max_data]
     plt.xlim(xrange)
