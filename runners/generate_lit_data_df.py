@@ -140,6 +140,7 @@ df_pmid['year'] = df_pmid['year'].astype(int)
 
 # merge literome pmids to
 pmids2 = pd.merge(pd.DataFrame(pmids, columns=[pm]), df_pmid, how='inner', on=pm)
+print('number of pmids dropped: {0}'.format(pmids.shape[0]-pmids2.shape[0]))
 
 # merge (pm-issn) onto (claims)
 dfi3 = pd.merge(dfi2, pmids2[[pm, 'issn', 'year']], on=pm, how='left')

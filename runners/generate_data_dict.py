@@ -54,7 +54,7 @@ def main(df_type, version, present_columns, transform_columns,
     print('feature indices : {0} {1}'.format(ind_a, ind_b))
 
     mask_ids = df[ni].isin(ids)
-    up_dn = df.loc[mask_ids, [up, dn, ni]].drop_duplicates(ni).set_index(ni)
+    up_dn = df.loc[mask_ids, [ni, up, dn]].drop_duplicates(ni).set_index(ni)
     means = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].mean()).rename('mean')
     sizes = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ps].shape[0]).rename('len')
     max_ye = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ye].max()).rename('max_year')
@@ -62,12 +62,13 @@ def main(df_type, version, present_columns, transform_columns,
     diff_ye = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ye].max() - x[ye].min()).rename('delta_year')
 
     df_stats = pd.concat([up_dn, means, sizes, max_ye, min_ye, diff_ye], axis=1).reset_index()
-    df_stats = df_stats.reindex(columns=df_stats.columns[[1, 2, 0, 3, 4, 5, 6, 7]])
-
+    # df_stats = df_stats.reindex(columns=df_stats.columns[[1, 2, 0, 3, 4, 5, 6, 7]])
+    df_stats = df_stats.set_index(ni)
+    print(df_stats.head())
     df_stats.to_csv(expanduser('~/data/kl/claims/pairs_freq_{0}_v_{1}_n_{2}'
                                '_a_{3}_b_{4}.csv.gz'.format(df_type, version,
                                                             low_bound_history_length, low_freq, hi_freq)),
-                    compression='gzip', index=False)
+                    compression='gzip', index=True)
 
     data_dict = {str(idc): dft.loc[dft[ni].isin([idc]), present_columns].values.T[:] for idc in ids}
     data_dict2 = {}
@@ -107,8 +108,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # gw
-    # version = 8
-    # version = 9
 
     # version = 1 for lit
 

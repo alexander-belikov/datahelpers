@@ -10,8 +10,13 @@ import numpy as np
 import pickle
 import gzip
 
-up_alias = 'Entrez Gene Interactor A'
-dn_alias = 'Entrez Gene Interactor B'
+# up_alias = 'Entrez Gene Interactor A'
+# dn_alias = 'Entrez Gene Interactor B'
+version = 2
+
+dn_alias = 'Entrez Gene Interactor A'
+up_alias = 'Entrez Gene Interactor B'
+
 at_str = 'Experimental System'
 at_str_2 = 'Experimental System Type'
 pmid_alias = 'Pubmed ID'
@@ -179,6 +184,8 @@ dfi4 = pd.merge(dfi3, df_feature_cut, on=pm, how='left')
 print('dfi4.shape: {0}'.format(dfi4.shape))
 
 # impute missing ai's with 0.5
+#TODO might be not a good idea to impute with the mean
+
 mask = (dfi4[ai].isnull())
 mean_available_ai = round(dfi4.loc[~mask, ai].mean(), 2)
 print(mean_available_ai)
@@ -192,6 +199,6 @@ dfi6 = dfi4.copy()
 dfi6 = dfi6[[ni, up, dn, at, ye, ai]]
 
 
-with gzip.open(expanduser('~/data/kl/claims/df_bg_1.pgz'), 'wb') as fp:
+with gzip.open(expanduser('~/data/kl/claims/df_bg_{0}.pgz'.format(version)), 'wb') as fp:
     pickle.dump(dfi6, fp)
 
