@@ -151,7 +151,10 @@ def partition_dict_to_subsamples(dict_items, number_of_bins):
     order_keys = list(dict_items.keys())
     ordered_data = [dict_items[k] for k in order_keys]
     iis = bin_packing_mean(ordered_data, number_of_bins, distance_func=ks_2samp_multi_dim)
-    iis2 = reshuffle_bins(iis, ordered_data, 0.5, ks_2samp_multi_dim)
+    if number_of_bins > 1:
+        iis2 = reshuffle_bins(iis, ordered_data, 0.5, ks_2samp_multi_dim)
+    else:
+        iis2 = iis
     split_keys = [[order_keys[j] for j in ind_batch] for ind_batch in iis2]
     return split_keys
 
@@ -369,86 +372,87 @@ def bin_packing_mean(pdfs_input, number_bins, distance_func=ks_2samp):
     :param distance_func: sample distance func
     :return:
     """
+    if number_bins > 1:
+        # descending order in size and in std
+        inds = [x[0] for x in sorted(enumerate(pdfs_input),
+                                     key=lambda y: (y[1].shape[0], y[1].std()), reverse=True)]
 
-    # descending order in size and in std
-    inds = [x[0] for x in sorted(enumerate(pdfs_input),
-                                 key=lambda y: (y[1].shape[0], y[1].std()), reverse=True)]
+        weights = [pdfs_input[ii].shape[0] for ii in inds]
+        pdfs = [pdfs_input[ii] for ii in inds]
 
-    weights = [pdfs_input[ii].shape[0] for ii in inds]
-    pdfs = [pdfs_input[ii] for ii in inds]
+        w_mean0 = mean(weights)
+        sample0 = concatenate(pdfs_input)
+        items_per_bin = int(ceil(len(weights) / number_bins))
+        bin_capacity = (items_per_bin * w_mean0)
+        bin_product = bin_capacity * items_per_bin
 
-    w_mean0 = mean(weights)
-    sample0 = concatenate(pdfs_input)
-    items_per_bin = int(ceil(len(weights) / number_bins))
-    bin_capacity = (items_per_bin * w_mean0)
-    bin_product = bin_capacity * items_per_bin
+        if max(weights) > bin_capacity:
+            raise ValueError('Max item weight is greater than proposed bin cap')
+        # populate each bin with a largest available element
+        bins = [[x] for x in weights[:number_bins]]
+        indices = [[i] for i in inds[:number_bins]]
+        pdf_bins = [[i] for i in pdfs[:number_bins]]
 
-    if max(weights) > bin_capacity:
-        raise ValueError('Max item weight is greater than proposed bin cap')
-    # populate each bin with a largest available element
-    bins = [[x] for x in weights[:number_bins]]
-    indices = [[i] for i in inds[:number_bins]]
-    pdf_bins = [[i] for i in pdfs[:number_bins]]
+        indices_output = []
+        weights = weights[number_bins:]
+        inds = inds[number_bins:]
+        pdfs = pdfs[number_bins:]
 
-    indices_output = []
-    weights = weights[number_bins:]
-    inds = inds[number_bins:]
-    pdfs = pdfs[number_bins:]
+        diffs = [x - y for x, y in zip(weights[:-1], weights[1:])]
+        bbs = [0] + [j + 1 for j in range(len(diffs)) if diffs[j] != 0]
+        pdfs2 = [pdfs[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [pdfs[bbs[-1]:]]
+        inds2 = [inds[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [inds[bbs[-1]:]]
+        weights_uni = [weights[bbs[i]] for i in range(len(bbs))]
+        j_cur_bin = 0
+        k_cur_weight = 0
 
-    diffs = [x - y for x, y in zip(weights[:-1], weights[1:])]
-    bbs = [0] + [j + 1 for j in range(len(diffs)) if diffs[j] != 0]
-    pdfs2 = [pdfs[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [pdfs[bbs[-1]:]]
-    inds2 = [inds[bbs[i]:bbs[i + 1]] for i in range(len(bbs) - 1)] + [inds[bbs[-1]:]]
-    weights_uni = [weights[bbs[i]] for i in range(len(bbs))]
-    j_cur_bin = 0
-    k_cur_weight = 0
+        state = -1, -1, -1, -1
+        while weights_uni:
+            ind_bin = indices[j_cur_bin]
+            wei_bin = bins[j_cur_bin]
+            pdf_bin = pdf_bins[j_cur_bin]
+            ind_strata = inds2[k_cur_weight]
+            wei_strata = weights_uni[k_cur_weight]
+            pdf_strata = pdfs2[k_cur_weight]
 
-    state = -1, -1, -1, -1
-    while weights_uni:
-        ind_bin = indices[j_cur_bin]
-        wei_bin = bins[j_cur_bin]
-        pdf_bin = pdf_bins[j_cur_bin]
-        ind_strata = inds2[k_cur_weight]
-        wei_strata = weights_uni[k_cur_weight]
-        pdf_strata = pdfs2[k_cur_weight]
-
-        pi_tentative = (sum(wei_bin) + wei_strata) * (len(wei_bin) + 1)
-        pi_tentative_min = (sum(wei_bin) + min(weights_uni)) * (len(wei_bin) + 1)
-        if pi_tentative < bin_product:
-            dists = []
-            for pdf in pdf_strata:
-                bin_pdf_dist = distance_func(concatenate(pdf_bin), sample0)[0]
-                bin_pdf_dist_new = distance_func(concatenate(pdf_bin + [pdf]), sample0)[0]
-                diff_pdf = bin_pdf_dist_new / bin_pdf_dist
-                dists.append(diff_pdf)
-            j_best = argmin(array(dists) ** 2)
-            ind_bin.append(ind_strata.pop(j_best))
-            pdf_bin.append(pdf_strata.pop(j_best))
-            wei_bin.append(wei_strata)
-            accepted = True
-            state = j_cur_bin, k_cur_weight, len(bins), len(weights_uni)
-        else:
-            accepted = False
-        if not accepted and state == (j_cur_bin, k_cur_weight, len(bins), len(weights_uni)):
-            print('Loop detected')
-            indices.append([ind_strata.pop()])
-            pdf_bins.append([pdf_strata.pop()])
-            bins.append([wei_strata])
-        if not ind_strata:
-            inds2.pop(k_cur_weight)
-            pdfs2.pop(k_cur_weight)
-            weights_uni.pop(k_cur_weight)
-        if pi_tentative_min > bin_product:
-            indices_output.append(indices.pop(j_cur_bin))
-            pdf_bins.pop(j_cur_bin)
-            bins.pop(j_cur_bin)
-        if weights_uni:
-            k_cur_weight = (k_cur_weight + 1) % len(weights_uni)
-        if bins:
-            j_cur_bin = (j_cur_bin + 1) % len(bins)
-    indices_output.extend(indices)
+            pi_tentative = (sum(wei_bin) + wei_strata) * (len(wei_bin) + 1)
+            pi_tentative_min = (sum(wei_bin) + min(weights_uni)) * (len(wei_bin) + 1)
+            if pi_tentative < bin_product:
+                dists = []
+                for pdf in pdf_strata:
+                    bin_pdf_dist = distance_func(concatenate(pdf_bin), sample0)[0]
+                    bin_pdf_dist_new = distance_func(concatenate(pdf_bin + [pdf]), sample0)[0]
+                    diff_pdf = bin_pdf_dist_new / bin_pdf_dist
+                    dists.append(diff_pdf)
+                j_best = argmin(array(dists) ** 2)
+                ind_bin.append(ind_strata.pop(j_best))
+                pdf_bin.append(pdf_strata.pop(j_best))
+                wei_bin.append(wei_strata)
+                accepted = True
+                state = j_cur_bin, k_cur_weight, len(bins), len(weights_uni)
+            else:
+                accepted = False
+            if not accepted and state == (j_cur_bin, k_cur_weight, len(bins), len(weights_uni)):
+                print('Loop detected')
+                indices.append([ind_strata.pop()])
+                pdf_bins.append([pdf_strata.pop()])
+                bins.append([wei_strata])
+            if not ind_strata:
+                inds2.pop(k_cur_weight)
+                pdfs2.pop(k_cur_weight)
+                weights_uni.pop(k_cur_weight)
+            if pi_tentative_min > bin_product:
+                indices_output.append(indices.pop(j_cur_bin))
+                pdf_bins.pop(j_cur_bin)
+                bins.pop(j_cur_bin)
+            if weights_uni:
+                k_cur_weight = (k_cur_weight + 1) % len(weights_uni)
+            if bins:
+                j_cur_bin = (j_cur_bin + 1) % len(bins)
+        indices_output.extend(indices)
+    else:
+        indices_output = [range(len(pdfs_input))]
     return indices_output
-
 
 def check_packing(list_indices, weights, pdfs, distance_func=ks_2samp_multi_dim):
     """
@@ -460,7 +464,7 @@ def check_packing(list_indices, weights, pdfs, distance_func=ks_2samp_multi_dim)
     :return:
     """
     if not (sum(list(map(len, list_indices))) == len(weights) and len(weights) == len(pdfs)):
-        raise ValueError('cardinality of indices, weights and pdfs are not equal')
+        raise ValueError('cardinality of indices, weights and pdfs are nlsot equal')
 
     sample0 = concatenate(pdfs)
     bins = [[weights[j] for j in ind_batch] for ind_batch in list_indices]

@@ -86,6 +86,9 @@ dfi2, dfdd = dc.collapse_df(dfi, str_dicts=dfdd, dropna_columns=[pm, hi],
                             bool_columns=[ng, ft],
                             numeric_columns=[hi, sn, am_id, pm, sc, pr])
 
+pd.DataFrame(dfi2[pm].unique(), columns=[pm]).to_csv(expanduser('~/data/gw/gw_pmids.csv.gz'),
+                                                     sep=',', compression='gzip')
+
 with gzip.open(expanduser('~/data/kl/raw/medline_doc_cs_2.pgz'), 'rb') as fp:
     df_pmid = pickle.load(fp)
 

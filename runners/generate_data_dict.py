@@ -70,8 +70,19 @@ def main(df_type, version, present_columns, transform_columns,
                                                             low_bound_history_length, low_freq, hi_freq)),
                     compression='gzip', index=True)
 
-    data_dict = {str(idc): dft.loc[dft[ni].isin([idc]), present_columns].values.T[:] for idc in ids}
+    data_dict = {}
+    # size = len
+    notify_fraction = 0.01
+    n_notify = int(notify_fraction*len(ids))
+    print('n_notify: {0}'.format(n_notify))
+    for idc in ids:
+        data_dict[str(idc)] = dft.loc[dft[ni].isin([idc]), present_columns].values.T
+        if len(data_dict) % n_notify == 0:
+            print('{0:.3f} fraction processed. {1}'.format(notify_fraction*(len(data_dict)//n_notify),
+                                                           len(data_dict)))
+
     data_dict2 = {}
+
     for c in transform_columns:
         if c in present_columns:
             index = present_columns.index(c)

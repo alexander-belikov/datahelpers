@@ -75,6 +75,9 @@ decidables_bool = decidables.apply(lambda x: True if x > 0.5 else False)
 
 decidables = decidables_bool.reset_index().rename(columns={0:ps})
 
+pd.DataFrame(decidables[pm].unique(),
+             columns=[pm]).to_csv(expanduser('~/data/literome/literome_fulltext_pmids.csv.gz'),
+                                  compression='gzip')
 
 dfi2 = decidables
 
