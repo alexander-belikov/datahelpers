@@ -2,7 +2,7 @@ import pandas as pd
 from bm_support import disambiguation as di
 import re
 import multiprocessing as mp
-from os.path import expanduser
+from os.path import expanduser, exists
 from os import mkdir
 import argparse
 from nltk import download
@@ -100,7 +100,8 @@ if __name__ == "__main__":
                           'targets': targets}
 
     tmp_path = expanduser('~/tmp')
-    mkdir(tmp_path)
+    if not exists(tmp_path):
+        mkdir(tmp_path)
 
     kwargs_list = [{**barebone_dict_pars, **di.generate_fnames(tmp_path, j),
                     **{'dfa': df}} for j, df in
