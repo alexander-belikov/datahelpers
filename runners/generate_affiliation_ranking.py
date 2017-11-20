@@ -7,8 +7,6 @@ from os import mkdir
 import argparse
 from nltk import download
 
-
-
 aff = 'affiliation'
 pm = 'pmid'
 aff_id = 'aff_id'
@@ -31,9 +29,12 @@ def eat_cali(s):
     return re.sub(r'(?<=of California)+(,)', '', s)
 
 
-def prepare_pmid_affs(fname):
+def prepare_pmid_affs(fname, nhead):
     df = pd.read_csv(fname, sep='|', compression='gzip', index_col=False)
-    df = df[df.columns[1:]]
+    if nhead > 0:
+        df = df[df.columns[1:]].head(nhead)
+    else:
+        df = df[df.columns[1:]]
     df[aff] = df[aff].apply(lambda x: eat_cali(x))
     df_affs_ids = df[aff].drop_duplicates()
     df_affs_ids = df_affs_ids.reset_index().rename(columns={'index': aff_id})[[aff_id, aff]]
@@ -90,9 +91,6 @@ if __name__ == "__main__":
     df_pms, dfa = prepare_pmid_affs(args.fname_articles)
 
     dfb = prepare_ratings(args.fname_rankings)
-
-    if args.head > 0:
-        dfa = dfa.head(args.head)
 
     dfs = di.split_df(dfa, args.nparallel)
 
