@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    df_pms, dfa = prepare_pmid_affs(args.fname_articles)
+    df_pms, dfa = prepare_pmid_affs(args.fname_articles, nhead=args.head)
 
     dfb = prepare_ratings(args.fname_rankings)
 
