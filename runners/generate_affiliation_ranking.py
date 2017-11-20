@@ -4,6 +4,8 @@ import re
 import multiprocessing as mp
 from os.path import expanduser
 import argparse
+from nltk import download
+
 
 
 aff = 'affiliation'
@@ -104,6 +106,8 @@ if __name__ == "__main__":
 
     processes = [mp.Process(target=di.wrapper_disabmi, kwargs=kw)
                  for kw in kwargs_list]
+
+    download('stopwords')
 
     for p in processes:
         p.start()
