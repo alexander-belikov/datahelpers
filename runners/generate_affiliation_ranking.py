@@ -3,6 +3,7 @@ from bm_support import disambiguation as di
 import re
 import multiprocessing as mp
 from os.path import expanduser
+from os import mkdir
 import argparse
 from nltk import download
 
@@ -98,7 +99,10 @@ if __name__ == "__main__":
     barebone_dict_pars = {'dfb': dfb, 'full_report': False,
                           'targets': targets}
 
-    kwargs_list = [{**barebone_dict_pars, **di.generate_fnames(j),
+    tmp_path = expanduser('~/tmp')
+    mkdir(tmp_path)
+
+    kwargs_list = [{**barebone_dict_pars, **di.generate_fnames(tmp_path, j),
                     **{'dfa': df}} for j, df in
                    zip(range(args.nparallel), dfs)]
 
@@ -115,7 +119,7 @@ if __name__ == "__main__":
     for p in processes:
         p.join()
 
-    fnames = [di.generate_fnames(j) for j in range(args.nparallel)]
+    fnames = [di.generate_fnames(tmp_path, j) for j in range(args.nparallel)]
     dfs_agg = [pd.read_csv(fn['fname'], compression='gzip', index_col=0) for fn in fnames]
     aff_aff_map = pd.concat(dfs_agg)
 
