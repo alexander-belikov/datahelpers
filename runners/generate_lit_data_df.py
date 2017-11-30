@@ -17,6 +17,8 @@ ni = 'new_index'
 pm = 'pmid'
 ye = 'year'
 ai = 'ai'
+# affiliation rating
+ar = 'ar'
 
 df = pd.read_csv(expanduser('~/data/literome/pathway-extraction.txt.gz'), sep='\t', compression='gzip')
 
@@ -144,11 +146,19 @@ print(dfi4[ai].value_counts().head())
 dfi4.loc[mask, ai] = mean_available_ai
 print('{0} ai value imputed, out of {1}. It is {2:.3f}'.format(sum(mask), mask.shape[0], sum(mask)/mask.shape[0]))
 
-dfi5 = dfto.get_multiplet_to_int_index(dfi4, [up, dn], ni)
-print(dfi5[ai].value_counts().head())
 
-dfi6 = dfi5.copy()
-dfi6 = dfi6[[ni, up, dn, at, ye, ai]]
+df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
+                      compression='gzip').rename(columns={'rating': ar})
+
+dfi5 = pd.merge(dfi4, df_affs, how='left', on=pm)
+
+dfi5[ar] = dfi5[ar].fillna(-1)
+
+dfi6 = dfto.get_multiplet_to_int_index(dfi5, [up, dn], ni)
+print(dfi6[ai].value_counts().head())
+
+dfi7 = dfi6.copy()
+dfi7 = dfi7[[ni, up, dn, at, ye, ai, ar]]
 
 with gzip.open(expanduser('~/data/kl/claims/df_lit_6.pgz'), 'wb') as fp:
-    pickle.dump(dfi6, fp)
+    pickle.dump(dfi7, fp)

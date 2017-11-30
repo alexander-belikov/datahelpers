@@ -2,7 +2,6 @@ import pandas as pd
 import bm_support.gene_id_converter as bgc
 import datahelpers.dftools as dfto
 from os.path import expanduser
-from itertools import product
 import numpy as np
 from wos_parser.parse import issn2int
 from datahelpers.aux import unfold_df, find_closest_year
@@ -19,7 +18,9 @@ pm = 'pmid'
 ye = 'year'
 ai = 'ai'
 pm = 'pmid'
-version = 7
+ar = 'ar'
+
+version = 8
 
 df = pd.read_csv(expanduser('/Users/belikov/data/literome/literome_fulltext_claims.csv.gz'),
                  sep=',', compression='gzip')
@@ -37,7 +38,7 @@ df2 = df.loc[df['EventType'].isin(conv_dict.keys())]
 df2[at] = df2['EventType'].apply(lambda x: conv_dict[x])
 
 
-df3 = df2.rename(columns={'Cause':up, 'Theme': dn})
+df3 = df2.rename(columns={'Cause': up, 'Theme': dn})
 
 
 # convert symbols to entrez id
@@ -160,14 +161,20 @@ print(dfi4[ai].value_counts().head())
 dfi4.loc[mask, ai] = mean_available_ai
 print('{0} ai value imputed, out of {1}. It is {2:.3f} fraction'.format(sum(mask), mask.shape[0], sum(mask)/mask.shape[0]))
 
-dfi5 = dfto.get_multiplet_to_int_index(dfi4, [up, dn], ni)
+df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
+                      compression='gzip').rename(columns={'rating': ar})
+
+dfi5 = pd.merge(dfi4, df_affs, how='left', on=pm)
+
+dfi5[ar] = dfi5[ar].fillna(-1)
+
+dfi5 = dfto.get_multiplet_to_int_index(dfi5, [up, dn], ni)
 print(dfi5[ai].value_counts().head())
 
 dfi6 = dfi5.copy()
-dfi6 = dfi6[[ni, up, dn, at, ye, ai]]
+dfi6 = dfi6[[ni, up, dn, at, ye, ai, ar]]
 
-
-with gzip.open(expanduser('~/data/kl/claims/df_lit_{0}.pgz'.format(version)), 'wb') as fp:
+with gzip.open(expanduser('~/data/kl/claims/df_litft_{0}.pgz'.format(version)), 'wb') as fp:
     pickle.dump(dfi6, fp)
 
 

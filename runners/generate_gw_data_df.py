@@ -71,13 +71,17 @@ pr = 'prec'
 eat = 'exp_at'
 gt = 'gg'
 ps = 'pos'
-ai = 'ArticleInfluence'
+aiexp = 'ArticleInfluence'
 ni = 'new_index'
 origin = 'gw'
+ai = 'ai'
+ar = 'ar'
 # version = 8
-version = 9
+# version = 9
+# version with affiliation ranking
+version = 10
 
-version2actions = {8: '', 9: '_v2'}
+version2actions = {8: '', 9: '_v2', 10: ''}
 
 print('working to produce version {0}'.format(version))
 
@@ -145,8 +149,15 @@ df_proxy_years = pd.DataFrame(np.array(list_proxy_year), columns=['issn', 'year'
 df_pmid3 = pd.merge(df_pmid2, df_proxy_years, on=['issn', 'year'])
 df_ai = df_ai.rename(columns={'year': 'ai_year'})
 df_feature = pd.merge(df_pmid3, df_ai, left_on=['issn', 'proxy_year'], right_on=['issn', 'ai_year'])
-df_feature_cut = df_feature[['pmid', 'ai_cdf']].rename(columns={'ai_cdf': 'ai'})
+df_feature_cut = df_feature[['pmid', 'ai_cdf']].rename(columns={'ai_cdf': ai})
 dfi4 = pd.merge(dfi3, df_feature_cut, on=pm)
+
+df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
+                      compression='gzip').rename(columns={'rating': ar})
+
+dfi4 = pd.merge(dfi4, df_affs, how='left', on=pm)
+
+dfi4[ar] = dfi4[ar].fillna(-1)
 
 # merge (id-pm-claims-issn-ye-ai) onto (id-up-dn)
 df_ha = pd.read_csv('~/data/kl/raw/human_action.txt.gz',
@@ -175,7 +186,6 @@ print('fraction of claims remaining after multiple similar claims from the same 
 fraction = sum(dfi6['year'] < 1990)/dfi6.shape[0]
 print('fraction of claims before 1990: {0:.4f}'.format(fraction))
 
-
 # create positive claim column
 # new_index is defined up, dn pair; 
 # the actions can as positive and negative
@@ -200,6 +210,8 @@ def xor(df, ccs, c):
 dfi7 = xor(dfi6, [at, ng], ps)
 
 print('number of rows in saved df_{0}_{1}.pgz: {2}'.format(origin, version, dfi7.shape[0]))
+
+dfi7 = dfi7[[ni, up, dn, at, ye, ai, ar]]
 
 with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(origin, version)), 'wb') as fp:
     pickle.dump(dfi7, fp)

@@ -16,6 +16,7 @@ iden = 'identity'
 idt = ni
 ps = 'pos'
 ai = 'ai'
+ar = 'ar'
 
 
 def main(df_type, version, present_columns, transform_columns,
