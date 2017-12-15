@@ -6,7 +6,7 @@ import numpy as np
 from wos_parser.parse import issn2int
 import pickle
 import gzip
-from datahelpers.aux import cut_string, unfold_df, find_closest_year, drop_duplicates_cols_arrange_col
+from datahelpers.aux import unfold_df, find_closest_year
 
 up = 'up'
 dn = 'dn'

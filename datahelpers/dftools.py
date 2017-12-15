@@ -269,3 +269,52 @@ def extract_idc_within_frequency_interval(df, id_col, flag_col, freq_int, min_le
 
 def XOR(s1, s2):
     return ~(s1 | s2) | (s1 & s2)
+
+
+def accumulate_dicts(dict_list):
+    """
+    convert a list of dicts to one dict
+    :param dict_list:
+    :return:
+    """
+    integral_dict = {}
+    for item in dict_list:
+        integral_dict = {**integral_dict, **item}
+    return integral_dict
+
+
+def dict_to_array(ddict):
+    """
+        ddict contains arrays of size n \times k_i
+        final array has size (n+1) \times \sum k_i
+    """
+    keys = list(ddict.keys())
+    arrays_list = [ddict[k] for k in keys]
+    arr = np.concatenate(arrays_list, axis=1)
+    keys_list = [[int(k)]*ddict[k].shape[1] for k in keys]
+    keys_arr = np.concatenate(keys_list)
+    final_array = np.concatenate([keys_arr.reshape(-1, keys_arr.shape[0]), arr])
+    return final_array
+
+
+def select_appropriate_datapoints(df, masks):
+    m0 = pd.Series([True]*df.shape[0], df.index)
+    for c, thr, foo in masks:
+        m = (foo(df[c], thr))
+        m0 &= m
+    return df.loc[m0].copy()
+
+
+def drop_duplicates_cols_arrange_col(dft, columns, col):
+    # drop rows with col == 'NULL'
+    # drop (ni, pm) duplicates
+    # only max value of col remain from duplicates
+    maskt = (dft[col] == 'NULL')
+    print('fraction of claims with missing '
+          'precision dropped: {0:.4f}'.format(float(sum(maskt)) / maskt.shape[0]))
+    dft2 = dft.loc[~maskt].copy()
+    dft2[col] = dft2[col].astype(float)
+    dft2 = dft2.reset_index(drop=True)
+    idx = dft2.groupby(columns)[col].idxmax()
+    dft3 = dft2.loc[idx]
+    return dft3

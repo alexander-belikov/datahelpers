@@ -9,10 +9,11 @@ import wos_agg.aux as waa
 import numpy as np
 import pickle
 import gzip
+from datahelpers.aux import find_closest_year
 
 # up_alias = 'Entrez Gene Interactor A'
 # dn_alias = 'Entrez Gene Interactor B'
-version = 2
+version = 3
 
 dn_alias = 'Entrez Gene Interactor A'
 up_alias = 'Entrez Gene Interactor B'
@@ -30,52 +31,13 @@ ni = 'new_index'
 pm = 'pmid'
 ye = 'year'
 ai = 'ai'
-
-
-def find_closest_year(x, years):
-    # what if we don't the feature (article influence, e.g.) for a give (issn, year) pair?
-    # yield the closet year for the same issn!
-    # add proxy_years to (pm-issn-ye) which are closest to issn-ye in (issn-ye-ai)
-    # years is sorted
-    left = 0
-    right = len(years) - 1
-    if x <= years[left]:
-        return years[left]
-    elif x >= years[right]:
-        return years[right]
-    else:
-        while right - left > 1:
-            mid = (right + left) // 2
-            if (x - years[left]) * (years[mid] - x) > 0:
-                right = mid
-            else:
-                left = mid
-        return years[left]
-
-
-def drop_duplicates_cols_arrange_col(dft, columns, col):
-    # drop rows with col == 'NULL'
-    # drop (ni, pm) duplicates
-    # only max value of col remain from duplicates
-    maskt = (dft[col] == 'NULL')
-    print('fraction of claims with missing '
-          'precision dropped: {0:.4f}'.format(float(sum(maskt)) / maskt.shape[0]))
-    dft2 = dft.loc[~maskt].copy()
-    dft2[col] = dft2[col].astype(float)
-    dft2 = dft2.reset_index(drop=True)
-    idx = dft2.groupby(columns)[col].idxmax()
-    dft3 = dft2.loc[idx]
-    # df3 = df3.drop_duplicates(columns)
-    print('fraction of claims (same pmid extractions) dropped: {0:.4f}'.format(1. - float(df3.shape[0]) / df2.shape[0]))
-    return dft3
-
+ar = 'ar'
 
 df = pd.read_csv('/Users/belikov/data/biogrid/BIOGRID-ALL-3.4.152.tab2.zip', header=0,
                  sep='\t', compression='zip', low_memory=False)
 
 
 df2 = df.rename(columns={up_alias: up, dn_alias: dn, pmid_alias: pm})[[up, dn, pm, at_str]].copy()
-
 
 m1 = df2[up].apply(waa.is_int)
 print(sum(m1), m1.shape[0])
@@ -194,11 +156,20 @@ dfi4.loc[mask, ai] = mean_available_ai
 print('{0} ai value imputed, out of {1}. It is {2:.3f}'.format(sum(mask), mask.shape[0], sum(mask)/mask.shape[0]))
 
 print(dfi4[ai].value_counts().head())
+dfi4[ps] = dfi4[ps].astype(int)
+dfi4.head()
 
-dfi6 = dfi4.copy()
-dfi6 = dfi6[[ni, up, dn, at, ye, ai]]
+df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
+                      compression='gzip').rename(columns={'rating': ar})
 
+dfi5 = pd.merge(dfi4, df_affs, how='left', on=pm)
+
+dfi5[ar] = dfi5[ar].fillna(-1)
+
+print(dfi5[ar].value_counts().head())
+
+dfi6 = dfi5.copy()
+dfi6 = dfi6[[ni, up, dn, at, ye, ai, ar]]
 
 with gzip.open(expanduser('~/data/kl/claims/df_bg_{0}.pgz'.format(version)), 'wb') as fp:
     pickle.dump(dfi6, fp)
-
