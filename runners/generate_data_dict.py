@@ -6,25 +6,22 @@ from sklearn.preprocessing import MinMaxScaler
 import gzip
 import pickle
 from os.path import expanduser
+from datahelpers.aux import str2bool
 from datahelpers.partition import partition_dict_to_subsamples
+from bm_support.supervised import cluster_optimally_pd
+from datahelpers.constants import iden, ye, ai, ps, up, dn, ar, ni, nw, wi
 
-ye = 'year'
-up = 'up'
-dn = 'dn'
-ni = 'new_index'
-iden = 'identity'
 idt = ni
-ps = 'pos'
-ai = 'ai'
-ar = 'ar'
 
 
 def main(df_type, version, present_columns, transform_columns,
-         low_freq, hi_freq, low_bound_history_length, n_samples):
+         low_freq, hi_freq, low_bound_history_length, n_samples, waves_analysis, test_head):
 
     with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(df_type, version)), 'rb') as fp:
         df = pickle.load(fp)
 
+    if test_head > 0:
+        df = df.head(test_head)
     # if ai in present_columns:
     #     alpha = 0.9
     #     mask = (df[ai] > alpha)
@@ -47,7 +44,18 @@ def main(df_type, version, present_columns, transform_columns,
     if iden in present_columns:
         df[iden] = 1
 
+    if waves_analysis:
+        df_ = df.groupby(ni).apply(lambda x: cluster_optimally_pd(x[ye], 2))
+        df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
+        present_columns = present_columns[:-1] + list(df_.columns) + [present_columns[-1]]
+        print(df.head())
+        print('*** value counts of {0}'.format(wi))
+        print(df[wi].value_counts())
+        print('*** value counts of {0}'.format(nw))
+        print(df.drop_duplicates(ni)[nw].value_counts())
+
     dft = df[[ni] + present_columns].copy()
+    print(dft.head())
 
     ids = extract_idc_within_frequency_interval(dft, ni, ps, (low_freq, hi_freq),
                                                 low_bound_history_length)
@@ -64,17 +72,21 @@ def main(df_type, version, present_columns, transform_columns,
 
     df_stats = pd.concat([up_dn, means, sizes, max_ye, min_ye, diff_ye], axis=1).reset_index()
     # df_stats = df_stats.reindex(columns=df_stats.columns[[1, 2, 0, 3, 4, 5, 6, 7]])
+
     df_stats = df_stats.set_index(ni)
     print(df_stats.head())
-    df_stats.to_csv(expanduser('~/data/kl/claims/pairs_freq_{0}_v_{1}_n_{2}'
-                               '_a_{3}_b_{4}.csv.gz'.format(df_type, version,
-                                                            low_bound_history_length, low_freq, hi_freq)),
-                    compression='gzip', index=True)
+    if test_head < 0:
+        df_stats.to_csv(expanduser('~/data/kl/claims/pairs_freq_{0}_v_{1}_n_{2}'
+                                   '_a_{3}_b_{4}.csv.gz'.format(df_type, version,
+                                                                low_bound_history_length, low_freq, hi_freq)),
+                        compression='gzip', index=True)
 
     data_dict = {}
     # size = len
     notify_fraction = 0.01
     n_notify = int(notify_fraction*len(ids))
+    if n_notify < 1:
+        n_notify = 1
     print('n_notify: {0}'.format(n_notify))
     for idc in ids:
         data_dict[str(idc)] = dft.loc[dft[ni].isin([idc]), present_columns].values.T
@@ -111,10 +123,12 @@ def main(df_type, version, present_columns, transform_columns,
 
     datatype = '_'.join(present_columns)
 
-    with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}_c_{2}_m_{3}_'
-                              'n_{4}_a_{5}_b_{6}.pgz'.format(df_type, version, datatype, n_samples,
-                                                             low_bound_history_length, low_freq, hi_freq)), 'wb') as fp:
-        pickle.dump(data_batches, fp)
+    if test_head < 0:
+        with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}_c_{2}_m_{3}_'
+                                  'n_{4}_a_{5}_b_{6}.pgz'.format(df_type, version, datatype, n_samples,
+                                                                 low_bound_history_length,
+                                                                 low_freq, hi_freq)), 'wb') as fp:
+            pickle.dump(data_batches, fp)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -147,6 +161,14 @@ if __name__ == "__main__":
 
     parser.add_argument('--transform-columns', nargs='*', default=['year'])
 
+    parser.add_argument('--wa', type=str2bool,
+                        default=False,
+                        help='add wave interest features')
+
+    parser.add_argument('--test', type=int,
+                        default=-1,
+                        help='test on the head of the dataset')
+
     args = parser.parse_args()
     print(args._get_kwargs())
 
@@ -154,4 +176,4 @@ if __name__ == "__main__":
     min_size_history = args.minsize_sequence
 
     main(args.datasource, args.version, args.data_columns, args.transform_columns,
-         low_f, hi_f, min_size_history, args.nsamples)
+         low_f, hi_f, min_size_history, args.nsamples, args.wa, args.test)

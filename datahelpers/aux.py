@@ -1,4 +1,5 @@
 from itertools import product
+import argparse
 
 def cut_string(x):
     if '_' in x:
@@ -60,3 +61,11 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
     print('fraction of claims (same pmid extractions) dropped: {0:.4f}'.format(1. -
                                                                                float(df3.shape[0]) / df2.shape[0]))
     return df3
+
+def str2bool(v):
+    if v.lower() in ("yes", "true", "t", "y" "1"):
+        return True
+    if v.lower() in ("no", "false", "f", "n" "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
