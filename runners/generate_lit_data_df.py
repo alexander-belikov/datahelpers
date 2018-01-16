@@ -7,18 +7,10 @@ from wos_parser.parse import issn2int
 import pickle
 import gzip
 from datahelpers.aux import unfold_df, find_closest_year
+from datahelpers.constants import iden, pm, ye, ai, ps, up, dn, ar, ni, cexp, qcexp, gu, nw, wi
 
-up = 'up'
-dn = 'dn'
-ps = 'pos'
 at = 'action'
 at = 'pos'
-ni = 'new_index'
-pm = 'pmid'
-ye = 'year'
-ai = 'ai'
-# affiliation rating
-ar = 'ar'
 
 df = pd.read_csv(expanduser('~/data/literome/pathway-extraction.txt.gz'), sep='\t', compression='gzip')
 
@@ -158,7 +150,7 @@ dfi6 = dfto.get_multiplet_to_int_index(dfi5, [up, dn], ni)
 print(dfi6[ai].value_counts().head())
 
 dfi7 = dfi6.copy()
-dfi7 = dfi7[[ni, up, dn, at, ye, ai, ar]]
+dfi7 = dfi7[[ni, pm, up, dn, at, ye, ai, ar]]
 
 with gzip.open(expanduser('~/data/kl/claims/df_lit_6.pgz'), 'wb') as fp:
     pickle.dump(dfi7, fp)

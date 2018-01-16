@@ -5,6 +5,7 @@ integer_agg_index = 'it'
 na_names = ['NULL', 'null', 'Null', 'NA', 'NAN', 'nan']
 
 iden = 'identity'
+pm = 'pmid'
 ye = 'year'
 ai = 'ai'
 hi_ai = 'aihi'

@@ -8,6 +8,8 @@ import gzip
 import json
 from os.path import expanduser
 from datahelpers.aux import find_closest_year, drop_duplicates_cols_arrange_col
+from datahelpers.constants import iden, pm, ye, ai, ps, up, dn, ar, ni, cexp, qcexp, gu, nw, wi
+
 
 # TODO revamp min year for ef_ai
 # TODO attach ai ~ separate func
@@ -16,8 +18,6 @@ with gzip.open(expanduser('~/data/kl/raw/val_geneways_cs_0.pgz'), 'rb') as fp:
     dfi = pickle.load(fp)
 
 hi = 'hiid'
-up = 'upstream'
-dn = 'downstream'
 up2 = 'up'
 dn2 = 'dn'
 am_id = 'actionmentionid'
@@ -26,18 +26,12 @@ at = 'at2'
 ng = 'negative'
 sn = 'sentencenumber'
 at_orig = 'actiontype'
-pm = 'pmid'
-ye = 'year'
 sc = 'score'
 pr = 'prec'
 eat = 'exp_at'
 gt = 'gg'
-ps = 'pos'
 aiexp = 'ArticleInfluence'
-ni = 'new_index'
 origin = 'gw'
-ai = 'ai'
-ar = 'ar'
 # version = 8
 # version = 9
 # version with affiliation ranking
