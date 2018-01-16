@@ -1,8 +1,6 @@
 import argparse
 import pandas as pd
-import numpy as np
 from datahelpers.dftools import extract_idc_within_frequency_interval
-from sklearn.preprocessing import MinMaxScaler
 import gzip
 import pickle
 from os.path import expanduser
@@ -11,10 +9,8 @@ from datahelpers.partition import partition_dict_to_subsamples
 from bm_support.supervised import cluster_optimally_pd
 from datahelpers.constants import iden, ye, ai, ps, up, dn, ar, ni, nw, wi
 
-idt = ni
 
-
-def main(df_type, version, present_columns, transform_columns,
+def main(df_type, version, present_columns,
          low_freq, hi_freq, low_bound_history_length, n_samples, waves_analysis, test_head):
 
     with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(df_type, version)), 'rb') as fp:
@@ -96,15 +92,6 @@ def main(df_type, version, present_columns, transform_columns,
 
     data_dict2 = {}
 
-    for c in transform_columns:
-        if c in present_columns:
-            index = present_columns.index(c)
-            for k, d in data_dict.items():
-                sc = MinMaxScaler()
-                d2 = d.copy().astype(np.float)
-                d2[index] = np.squeeze(sc.fit_transform(d[index].reshape(-1, 1)))
-                data_dict2[k] = d2
-
     total_size = sum(map(lambda x: x.shape[1], data_dict2.values()))
     print('total size: {0}'.format(total_size))
     partition_dict = {k: data_dict2[k][ind_a:ind_b].T for k in data_dict2.keys()}
@@ -158,8 +145,6 @@ if __name__ == "__main__":
                         help='define interval of observed freqs for sequence consideration')
 
     parser.add_argument('--data-columns', nargs='*', default=['year', 'identity', 'ai', 'pos'])
-
-    parser.add_argument('--transform-columns', nargs='*', default=['year'])
 
     parser.add_argument('--wa', type=str2bool,
                         default=False,
