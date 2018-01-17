@@ -1,62 +1,50 @@
 import argparse
 import pandas as pd
-from datahelpers.dftools import extract_idc_within_frequency_interval
+from datahelpers.dftools import extract_idc_within_frequency_interval, count_elements_smaller_than_self_wdensity
 import gzip
 import pickle
 from os.path import expanduser
 from datahelpers.aux import str2bool
+from numpy import ceil
 from datahelpers.partition import partition_dict_to_subsamples
 from bm_support.supervised import cluster_optimally_pd
-from datahelpers.constants import iden, ye, ai, ps, up, dn, ar, ni, nw, wi
+from datahelpers.constants import ye, ai, ps, up, dn, ar, ni, nw, wi, cpop, cden
 
 
 def main(df_type, version, present_columns,
-         low_freq, hi_freq, low_bound_history_length, n_samples, waves_analysis, test_head):
+         low_freq, hi_freq, low_bound_history_length, n_samples, test_head):
 
     with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(df_type, version)), 'rb') as fp:
         df = pickle.load(fp)
 
+    ids = extract_idc_within_frequency_interval(df, ni, ps, (low_freq, hi_freq),
+                                                low_bound_history_length)
     if test_head > 0:
-        df = df.head(test_head)
-    # if ai in present_columns:
-    #     alpha = 0.9
-    #     mask = (df[ai] > alpha)
-    #     df[ai + 'hi'] = 0
-    #     df.loc[mask, ai + 'hi'] = 1
-    #     df[ai] = (df[ai] - alpha) / (1 - alpha)
-    #     print(sum(mask), sum(~mask))
-    #     df.loc[~mask, ai] = 0
-    #     present_columns.insert(present_columns.index(ai) + 1, ai + 'hi')
+        mask_ids = df[ni].isin(ids[:test_head])
+        df = df.loc[mask_ids]
+        ids = ids[:test_head]
+
+    print('number of unique ids : {0}'.format(len(ids)))
 
     print(present_columns)
 
-    if ai in present_columns:
-        ind_a = present_columns.index('ai')
-        ind_b = present_columns.index('ai') + 1
-    else:
-        ind_b = len(present_columns)
-        ind_a = ind_b - 1
-
-    if iden in present_columns:
-        df[iden] = 1
-
-    if waves_analysis:
+    if wi or nw in present_columns:
         df_ = df.groupby(ni).apply(lambda x: cluster_optimally_pd(x[ye], 2))
+        extra_cols = set(df_.columns)
         df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
-        present_columns = present_columns[:-1] + list(df_.columns) + [present_columns[-1]]
         print(df.head())
         print('*** value counts of {0}'.format(wi))
         print(df[wi].value_counts())
         print('*** value counts of {0}'.format(nw))
         print(df.drop_duplicates(ni)[nw].value_counts())
+        print(extra_cols)
 
-    dft = df[[ni] + present_columns].copy()
-    print(dft.head())
+    present_columns += list(set(extra_cols) - set(present_columns))
 
-    ids = extract_idc_within_frequency_interval(dft, ni, ps, (low_freq, hi_freq),
-                                                low_bound_history_length)
-    print('number of unique ids : {0}'.format(len(ids)))
-    print('feature indices : {0} {1}'.format(ind_a, ind_b))
+    if cpop in present_columns:
+        df_ = df.groupby(ni).apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye]))
+        df_ = df_.rename(columns={0: cpop, 1: cden})
+        df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
 
     mask_ids = df[ni].isin(ids)
     up_dn = df.loc[mask_ids, [ni, up, dn]].drop_duplicates(ni).set_index(ni)
@@ -67,7 +55,7 @@ def main(df_type, version, present_columns,
     diff_ye = df.loc[mask_ids].groupby(ni).apply(lambda x: x[ye].max() - x[ye].min()).rename('delta_year')
 
     df_stats = pd.concat([up_dn, means, sizes, max_ye, min_ye, diff_ye], axis=1).reset_index()
-    # df_stats = df_stats.reindex(columns=df_stats.columns[[1, 2, 0, 3, 4, 5, 6, 7]])
+    df_stats['pop_density'] = df_stats['len'] / df_stats['delta_year']
 
     df_stats = df_stats.set_index(ni)
     print(df_stats.head())
@@ -78,28 +66,24 @@ def main(df_type, version, present_columns,
                         compression='gzip', index=True)
 
     data_dict = {}
-    # size = len
     notify_fraction = 0.01
-    n_notify = int(notify_fraction*len(ids))
-    if n_notify < 1:
-        n_notify = 1
+    n_notify = int(ceil(notify_fraction * len(ids)))
     print('n_notify: {0}'.format(n_notify))
+
     for idc in ids:
-        data_dict[str(idc)] = dft.loc[dft[ni].isin([idc]), present_columns].values.T
+        data_dict[str(idc)] = df.loc[df[ni].isin([idc]), present_columns].values.T
         if len(data_dict) % n_notify == 0:
-            print('{0:.3f} fraction processed. {1}'.format(notify_fraction*(len(data_dict)//n_notify),
-                                                           len(data_dict)))
+            print('{0:.3f}% fraction processed. {1}'.format(100 * len(data_dict) / len(ids),
+                                                            len(data_dict)))
 
-    data_dict2 = {}
-
-    total_size = sum(map(lambda x: x.shape[1], data_dict2.values()))
+    total_size = sum(map(lambda x: x.shape[1], data_dict.values()))
     print('total size: {0}'.format(total_size))
-    partition_dict = {k: data_dict2[k][ind_a:ind_b].T for k in data_dict2.keys()}
+    partition_dict = {k: data_dict[k].T for k in data_dict.keys()}
 
     idc_partition = partition_dict_to_subsamples(partition_dict, n_samples)
 
     print('number of batches in partition {0}; number of subsamples {1}'.format(idc_partition, n_samples))
-    data_batches = [{k: data_dict2[k] for k in sub} for sub in idc_partition]
+    data_batches = [{k: data_dict[k] for k in sub} for sub in idc_partition]
     print('the actual number of subsamples {0}'.format(len(data_batches)))
 
     lens_ = [[sub_dict[k].shape[1] for k in sub_dict.keys()] for sub_dict in data_batches]
@@ -116,6 +100,7 @@ def main(df_type, version, present_columns,
                                                                  low_bound_history_length,
                                                                  low_freq, hi_freq)), 'wb') as fp:
             pickle.dump(data_batches, fp)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -144,11 +129,7 @@ if __name__ == "__main__":
                         nargs='+', default=[0.1, 0.9], type=float,
                         help='define interval of observed freqs for sequence consideration')
 
-    parser.add_argument('--data-columns', nargs='*', default=['year', 'identity', 'ai', 'pos'])
-
-    parser.add_argument('--wa', type=str2bool,
-                        default=False,
-                        help='add wave interest features')
+    parser.add_argument('--data-columns', nargs='*', default=['year', 'ai', 'pos'])
 
     parser.add_argument('--test', type=int,
                         default=-1,
@@ -160,5 +141,5 @@ if __name__ == "__main__":
     low_f, hi_f = args.partition_sequence
     min_size_history = args.minsize_sequence
 
-    main(args.datasource, args.version, args.data_columns, args.transform_columns,
-         low_f, hi_f, min_size_history, args.nsamples, args.wa, args.test)
+    main(args.datasource, args.version, args.data_columns,
+         low_f, hi_f, min_size_history, args.nsamples, args.test)

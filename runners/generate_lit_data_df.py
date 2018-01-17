@@ -149,8 +149,7 @@ dfi5[ar] = dfi5[ar].fillna(-1)
 dfi6 = dfto.get_multiplet_to_int_index(dfi5, [up, dn], ni)
 print(dfi6[ai].value_counts().head())
 
-dfi7 = dfi6.copy()
-dfi7 = dfi7[[ni, pm, up, dn, at, ye, ai, ar]]
+dfi7 = dfi6[[ni, pm, up, dn, at, ye, ai, ar]].copy()
 
 with gzip.open(expanduser('~/data/kl/claims/df_lit_6.pgz'), 'wb') as fp:
     pickle.dump(dfi7, fp)
