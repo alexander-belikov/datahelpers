@@ -1,4 +1,4 @@
-package dataheplers 0.2
+package datahelpers 0.2
 
 to proccess literome
 python generate_data_dict.py -v 8 -d gw --data-columns year identity ai pos -n 20 -p 0.1 0.9

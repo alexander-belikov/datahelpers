@@ -324,6 +324,8 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
 def count_elements_smaller_than_self(x):
     ii = argsort(x)
     ii2 = argsort(ii)
+    if ii2.dtype != int:
+        print(ii2.dtype, x.shape, ii2[:5])
     uniques, counts = unique(x, return_counts=True)
     csum = [0] + list(cumsum(counts)[:-1])
     cnts = concatenate([repeat(i, c) for i, c in zip(csum, counts)])[ii2]
@@ -331,9 +333,9 @@ def count_elements_smaller_than_self(x):
 
 
 def count_elements_smaller_than_self_wdensity(x):
-    cnts = count_elements_smaller_than_self(x)
+    # TODO test for small size x (smaller than 5)
+    cnts = count_elements_smaller_than_self(x.values)
     denom = (x.values - np.min(x))
-    print(cnts.dtype, denom.dtype)
-    dns = np.true_divide(cnts, denom, where=denom!=0)
+    dns = np.true_divide(cnts, denom, where=(denom!=0))
     r = pd.DataFrame(vstack([cnts, dns]).T, index=x.index)
     return r

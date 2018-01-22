@@ -9,6 +9,7 @@ from numpy import ceil
 from datahelpers.partition import partition_dict_to_subsamples
 from bm_support.supervised import cluster_optimally_pd
 from datahelpers.constants import ye, ai, ps, up, dn, ar, ni, nw, wi, cpop, cden
+from tqdm import tqdm, tqdm_pandas
 
 
 def main(df_type, version, present_columns,
@@ -20,16 +21,19 @@ def main(df_type, version, present_columns,
     ids = extract_idc_within_frequency_interval(df, ni, ps, (low_freq, hi_freq),
                                                 low_bound_history_length)
     if test_head > 0:
-        mask_ids = df[ni].isin(ids[:test_head])
-        df = df.loc[mask_ids]
         ids = ids[:test_head]
+
+    mask_ids = df[ni].isin(ids)
+    df = df.loc[mask_ids]
 
     print('number of unique ids : {0}'.format(len(ids)))
 
     print(present_columns)
+    tqdm.pandas(tqdm())
 
-    if wi or nw in present_columns:
-        df_ = df.groupby(ni).apply(lambda x: cluster_optimally_pd(x[ye], 2))
+    if (wi in present_columns) or (nw in present_columns):
+        print('starting optimal clustering:')
+        df_ = df.groupby(ni).progress_apply(lambda x: cluster_optimally_pd(x[ye], 2))
         extra_cols = set(df_.columns)
         df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
         print(df.head())
@@ -38,11 +42,11 @@ def main(df_type, version, present_columns,
         print('*** value counts of {0}'.format(nw))
         print(df.drop_duplicates(ni)[nw].value_counts())
         print(extra_cols)
-
-    present_columns += list(set(extra_cols) - set(present_columns))
+        present_columns += list(set(extra_cols) - set(present_columns))
 
     if cpop in present_columns:
-        df_ = df.groupby(ni).apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye]))
+        print('starting current popularity estimate')
+        df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye]))
         df_ = df_.rename(columns={0: cpop, 1: cden})
         df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
 
