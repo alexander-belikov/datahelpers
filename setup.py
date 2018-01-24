@@ -30,7 +30,9 @@ setup(
         "License :: OSI Approved :: BSD License",
     ],
     install_requires=[
+        'numpy',
         'pymysql', 'pandas',
-        'setuptools', 'PyWavelets'],
+        'setuptools', 'PyWavelets',
+        'matplotlib', 'seaborn'],
     include_dirs=[np.get_include()]
 )

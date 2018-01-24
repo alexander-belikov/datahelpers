@@ -4,7 +4,6 @@ from numpy import concatenate, argsort, cumsum, repeat, unique, vstack
 from .constants import protein_cols, triplet_index_cols, integer_agg_index
 from .collapse import regexp_reduce_yield_agg_dict
 
-
 def analyze_unique(df, column):
     dfr = df.drop_duplicates(df.columns)
     vc = dfr[column].value_counts()
@@ -339,3 +338,53 @@ def count_elements_smaller_than_self_wdensity(x):
     dns = np.true_divide(cnts, denom, where=(denom!=0))
     r = pd.DataFrame(vstack([cnts, dns]).T, index=x.index)
     return r
+
+
+def group(seq, sep):
+    g = []
+    for el in seq:
+        if el == sep:
+            yield g
+            g = []
+        else:
+            g.append(el)
+    yield g
+
+
+def parse_wos_simple_format(ll, keys):
+    info_dict = {}
+    # simplified version that works for one line info extraction
+    for item in ll:
+        morphems = item.split(' ')
+        prefix = morphems[0]
+        for k in keys:
+            if prefix == k:
+                info_dict[k] = morphems[1]
+    if len(info_dict) == len(keys):
+        out = [info_dict[k] for k in keys]
+        return out
+    else:
+        return []
+
+
+def agg_file_info(fname, keys):
+    # parsing web of science plain text dumps
+    # webofknowledge.com
+    lines = open(fname).read().splitlines()
+    lines2 = list(group(lines, ''))
+    data = [np.array(parse_wos_simple_format(x, keys)) for x in lines2]
+    non_empty_data = list(filter(lambda x: len(x), data))
+    y = np.vstack(non_empty_data)
+    return y
+
+
+def add_column_from_file(df, fpath, merge_column, merged_column, impute_mean=True):
+    df_cite = pd.read_csv(fpath, compression='gzip', index_col=None)
+    print(df_cite.shape)
+    df2 = pd.merge(df, df_cite, on=merge_column, how='left')
+    df_out = df2.copy()
+    if impute_mean:
+        mask = df2[merged_column].isnull()
+        mean = df2[merged_column].mean()
+        df_out.loc[mask, merged_column] = mean
+    return df_out
