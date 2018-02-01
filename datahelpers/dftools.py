@@ -4,6 +4,7 @@ from numpy import concatenate, argsort, cumsum, repeat, unique, vstack, full
 from .constants import protein_cols, triplet_index_cols, integer_agg_index
 from .collapse import regexp_reduce_yield_agg_dict
 
+
 def analyze_unique(df, column):
     dfr = df.drop_duplicates(df.columns)
     vc = dfr[column].value_counts()
@@ -320,22 +321,26 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
     return dft3
 
 
-def count_elements_smaller_than_self(x, window=None, exclude_self=False):
+def count_elements_smaller_than_self(x, window=None, right_continuous=False):
     ii = argsort(x)
     ii2 = argsort(ii)
     uniques, counts = unique(x, return_counts=True)
     if window and window >= 0:
-        csum = [np.sum(counts[(v - window <= uniques) & (uniques <= v)]) for v in uniques]
+        if right_continuous:
+            csum = [np.sum(counts[(v - window <= uniques) & (uniques <= v)]) for v in uniques]
+        else:
+            csum = [np.sum(counts[(v - window <= uniques) & (uniques < v)]) for v in uniques]
+
     else:
         csum = cumsum(counts)
-        if exclude_self:
+        if right_continuous:
             csum = [0] + list(csum[:-1])
     cnts = concatenate([repeat(i, c) for i, c in zip(csum, counts)])[ii2]
     return cnts
 
 
-def count_elements_smaller_than_self_wdensity(x, window=2, exclude_self=False):
-    cnts = count_elements_smaller_than_self(x.values, window)
+def count_elements_smaller_than_self_wdensity(x, window=None, right_continuous=False):
+    cnts = count_elements_smaller_than_self(x.values, window, right_continuous)
     if window and window > 0:
         denom = full(x.values.shape, float(window))
     else:

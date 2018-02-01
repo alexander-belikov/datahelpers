@@ -62,6 +62,7 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
                                                                                float(df3.shape[0]) / df2.shape[0]))
     return df3
 
+
 def str2bool(v):
     if v.lower() in ("yes", "true", "t", "y" "1"):
         return True

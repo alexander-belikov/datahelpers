@@ -175,7 +175,7 @@ at = ps
 up = up2
 dn = dn2
 
-dfi7 = dfi7[[ni, up, dn, at, ye, ai, ar]]
+dfi7 = dfi7[[ni, pm, up, dn, at, ye, ai, ar]]
 
 with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(origin, version)), 'wb') as fp:
     pickle.dump(dfi7, fp)
