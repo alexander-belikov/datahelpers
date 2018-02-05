@@ -1,53 +1,53 @@
 from .constants import up, dn, ye
 import datetime
-from numpy import concatenate, array
+from numpy import array
 from pandas import DataFrame
 import igraph as ig
 
 
-def prepare_head(dft):
+def project_weight(dft):
     edges_year = dft[[up, dn, ye]].groupby([up, dn, ye]).apply(lambda x: x.shape[0])
     edges = edges_year.groupby(level=(0, 1)).apply(lambda x: x.sum())
-    return edges.reset_index()
+    return edges.reset_index().rename(columns={0: 'weight'})
 
 
-def cut_edges(edges, nnodes=False, nedges=False):
+def cut_edges(edges, nnodes=False, nedges=False, verbose=False):
     edges2 = edges.copy()
-    print(edges2.shape)
+
+    if verbose:
+        print(edges2.shape)
     ups, dns = edges2[up].unique(), edges2[dn].unique()
     prots = list(set(ups) | set(dns))
-    print('{0} unique nodes'.format(len(prots)))
+
+    if verbose:
+        print('{0} unique nodes'.format(len(prots)))
     if nnodes:
         cut_prots = prots[:nnodes]
     else:
         cut_prots = prots
-    print('{0} cut unique nodes'.format(len(cut_prots)))
+    if verbose:
+        print('{0} cut unique nodes'.format(len(cut_prots)))
     if nnodes:
         mask = (edges2[up].isin(cut_prots)) & (edges2[dn].isin(cut_prots))
         edges2 = edges2.loc[mask]
-        print('so nodes cut : {0}'.format(edges2.shape))
+        if verbose:
+            print('so with nodes cut : we {0} edges'.format(edges2.shape[0]))
     if nedges:
         edges2 = edges2.head(nedges)
     ups, dns = edges2[up].unique(), edges2[dn].unique()
-    print(len(set(ups)), len(set(dns)))
+    if verbose:
+        print(len(set(ups)), len(set(dns)))
     prots = list(set(ups) | set(dns))
-    print(len(prots), edges2.shape, edges.shape)
+    if verbose:
+        print(len(prots), edges2.shape, edges.shape)
     int_to_prot = {k: prots[k] for k in range(len(prots))}
-    prot_to_int = {int_to_prot[k]:k for k in int_to_prot.keys()}
-    g_edges = list(map(lambda x: (prot_to_int[x[0]], prot_to_int[x[1]]), edges2[[up,dn]].values))
+    prot_to_int = {int_to_prot[k]: k for k in int_to_prot.keys()}
+
+    g_edges = list(map(lambda x: (prot_to_int[x[0]], prot_to_int[x[1]]), edges2[[up, dn]].values))
+    # weights has the same order as edges
+    g_edges_weights = list(edges2['weight'])
     g_vertices = prot_to_int.values()
-#     print(len(g_edges), len(g_vertices))
-    return g_edges, g_vertices, int_to_prot, prot_to_int
-
-
-def detect_comm(g_edges):
-    g = ig.Graph(g_edges, directed=True)
-    dt = datetime.datetime.now()
-    communities = g.community_edge_betweenness(directed=True)
-    dt2 = datetime.datetime.now()
-    print((dt2-dt).total_seconds())
-    clusters = communities.as_clustering(5)
-    print([len(c) for c in clusters])
+    return g_edges, g_vertices, int_to_prot, prot_to_int, g_edges_weights
 
 
 def optimal_nclusters(communities, frac=0.1, verbose=False):
@@ -64,79 +64,117 @@ def optimal_nclusters(communities, frac=0.1, verbose=False):
     return k-1
 
 
-def produce_cluster_df(df, cutoff_frac=0.1, unique_edges=True, cut_nodes=False, verbose=False):
-    # get edges df
-    ees = prepare_head(df)
+def produce_cluster_df(edges_df, cutoff_frac=0.1, unique_edges=True, cut_nodes=False, verbose=False):
+
+    # edges_df has up, dn and weight columns
+    if verbose:
+        print('number of edges: {0}'.format(edges_df.shape[0]))
 
     # choose subset graph with predefined number of nodes and edges
-    ee, vv, i2p, p2i = cut_edges(ees, nnodes=cut_nodes)
+    ee, vv, i2p, p2i, ws = cut_edges(edges_df, nnodes=cut_nodes)
+    if verbose:
+        print('number of edges after cutting: {0}'.format(len(ee)))
+
+    r = split_communities_cluster(ee, ws, cutoff_frac, unique_edges, verbose)
+
+    if verbose:
+        mbsp_agg, seconds = r
+    else:
+        mbsp_agg = r
+
+    domain_coding_df = DataFrame(array(mbsp_agg), columns=['int_id', 'domain_id'])
+    if verbose:
+        print('shape of domain_coding_df : {0}'.format(domain_coding_df.shape))
+
+    domain_coding_df['id'] = domain_coding_df['int_id'].apply(lambda x: i2p[x])
+
+    dff = edges_df.merge(domain_coding_df[['id', 'domain_id']], how='inner', left_on=up, right_on='id')
+    del dff['id']
+    dff2 = dff.merge(domain_coding_df[['id', 'domain_id']], how='inner',
+                     left_on=dn, right_on='id', suffixes=('_up', '_dn'))
+    del dff2['id']
+    if verbose:
+        return dff2, seconds
+    else:
+        return dff2
+
+
+def split_communities_cluster(ee, ws, cutoff_frac=0.1, unique_edges=True, verbose=False):
 
     if unique_edges:
         ee = list(set([x if x[0] <= x[1] else (x[1], x[0]) for x in ee]))
     # construct graph on edges
-    g = ig.Graph(ee)
+    g = ig.Graph(ee, directed=True)
 
     # sort connected components by size, decreasing order
     cc = sorted(g.clusters(), key=lambda x: len(x), reverse=True)
 
     # large connected components will be split into communities
+    cc_to_communize = list(filter(lambda x: len(x) > cutoff_frac * len(g.vs), cc))
 
-    cc_to_communize = list(filter(lambda x: len(x) > cutoff_frac * len(vv), cc))
     # small connected components will be aggregated
-
-    cc_to_aggregate = list(filter(lambda x: len(x) <= 0.1 * len(vv), cc))
+    cc_to_aggregate = list(filter(lambda x: len(x) <= cutoff_frac * len(g.vs), cc))
 
     if verbose:
+        print('number of nodes {0}, number of edges {1}'.format(len(g.vs), len(g.es)))
+
         print('number of disconnected components with > {0} '
               'fraction of nodes : {1}'.format(cutoff_frac, len(cc_to_communize)))
-        print('number of disconnected components with  <= {0} '
+        print('number of disconnected components with <= {0} '
               'fraction of nodes : {1}'.format(cutoff_frac, len(cc_to_aggregate)))
         sum_small_disconnected = sum(map(lambda x: len(x), cc_to_aggregate))
-        print('sum of small disconnected components des : {0}, '
+        print('sum of small disconnected components: {0}, '
               'frac of total number of nodes {1:.3f}'.format(sum_small_disconnected,
-                                                             float(sum_small_disconnected) / len(vv)))
+                                                             float(sum_small_disconnected) / len(g.vs)))
 
     diffuse_component = [node for cc0 in cc_to_aggregate for node in cc0]
     if verbose:
-        print(len(diffuse_component))
+        print('size of diffuse component: {0}'.format(len(diffuse_component)))
 
-    domains = []
+    community_count = 0
+    mbsp_agg = []
+    total_seconds = 0
     for c in cc_to_communize:
         # TODO redo the hacky part
         # hack to keep track of labels
-        conv_dd = dict(zip(range(len(c)), c))
+        if verbose:
+            print('community count : {0}'.format(community_count))
+
+        g0_node_g_node_conv = dict(zip(range(len(c)), c))
 
         # subgraph() disrespects the ids of c and creates ids from 0 conseq.
         g0 = g.subgraph(c)
 
+        # {edge of g : weight} dictionary
+        w_dict = dict(zip(ee, ws))
+
+        # edge order of g0
+        ee_g0 = [e.tuple for e in g0.es]
+
+        # weights of g0 in the order of g0
+        w_g0 = [w_dict[(g0_node_g_node_conv[a], g0_node_g_node_conv[b])] for a, b in ee_g0]
+
         if verbose:
             print(g0.summary())
         dt = datetime.datetime.now()
-        # communities = g0.community_edge_betweenness(directed=True)
-        communities = g0.community_fastgreedy()
+        communities = g0.community_infomap(edge_weights=w_g0)
         dt2 = datetime.datetime.now()
-        if verbose:
-            print('{0:.2f} sec'.format((dt2 - dt).total_seconds()))
-        k_opt = optimal_nclusters(communities, verbose=verbose)
-        print(k_opt)
-        clusters_ = communities.as_clustering(k_opt)
-        clusters = [[conv_dd[x] for x in c_] for c_ in clusters_]
-        if verbose:
-            print([len(c) for c in clusters])
-        ss0 = set(c)
-        ss1 = set([n for sublist in clusters for n in sublist])
-        print(len(ss0), len(ss1), len(ss0 & ss1))
-        domains.extend(clusters)
-
-    domains.append(diffuse_component)
+        cur_seconds = (dt2 - dt).total_seconds()
+        total_seconds += cur_seconds
+        mbsp = communities.membership
+        mbsp_agg.extend([(g0_node_g_node_conv[k], mbsp[k] + community_count)
+                         for k in g0_node_g_node_conv.keys()])
+        community_count += len(communities)
     if verbose:
-        print(len(domains), [len(x) for x in domains], sum([len(x) for x in domains]))
-        print(len(set([el for sublist in domains for el in sublist])))
+        print('{0:.2f} sec on comm detection'.format(total_seconds))
 
-    arr = concatenate([array([(x, k) for x in domains[k]]) for k in range(len(domains))])
-    print(arr.shape)
-    domain_coding_df = DataFrame(arr, columns=['int_id', 'domain_id'])
-    domain_coding_df['id'] = domain_coding_df['int_id'].apply(lambda x: i2p[x])
-    dff = df.merge(domain_coding_df[['id', 'domain_id']], how='left', left_on=up, right_on='id')
-    dff2 = dff.merge(domain_coding_df, how='left', left_on=dn, right_on='id', suffixes=('_up', '_dn'))
-    return dff2
+    if verbose:
+        print('size of communal component: {0}'.format(len(mbsp_agg)))
+
+    mbsp_agg.extend([(n, community_count) for n in diffuse_component])
+
+    if verbose:
+        return mbsp_agg, total_seconds
+    else:
+        return mbsp_agg
+
