@@ -7,16 +7,24 @@ from os.path import expanduser
 from datahelpers.aux import str2bool
 from numpy import ceil
 from datahelpers.partition import partition_dict_to_subsamples
-from bm_support.supervised import cluster_optimally_pd
-from datahelpers.constants import ye, ai, ps, up, dn, ar, ni, nw, wi, cpop, cden
+from bm_support.supervised import cluster_optimally_pd, optimal_2split_pd
+from datahelpers.community_tools import produce_cluster_df, project_weight
+from datahelpers.constants import ye, ai, ps, up, dn, ar, ni, nw, wi, cpop, pm, cden
 from tqdm import tqdm, tqdm_pandas
 
 
-def main(df_type, version, present_columns,
+def main(df_type, version, feature_groups,
          low_freq, hi_freq, low_bound_history_length, n_samples, test_head):
 
     with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(df_type, version)), 'rb') as fp:
         df = pickle.load(fp)
+
+    dft = df.copy()
+
+    # feature_groups = ['mainfeatures', 'cycle', 'density', 'normeddensity']
+    columns_dict = {}
+    if 'mainfeatures' in feature_groups:
+        columns_dict['mainfeatures'] = [ni, pm, ye, ai, ar]
 
     ids = extract_idc_within_frequency_interval(df, ni, ps, (low_freq, hi_freq),
                                                 low_bound_history_length)
@@ -28,27 +36,73 @@ def main(df_type, version, present_columns,
 
     print('number of unique ids : {0}'.format(len(ids)))
 
-    print(present_columns)
+    print('feature groups', feature_groups)
+
     tqdm.pandas(tqdm())
 
-    if (wi in present_columns) or (nw in present_columns):
+    windows = [None, 1, 2]
+    density_columns = []
+
+    if 'density' in feature_groups:
+        for w in windows:
+            df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye], w))
+            if w:
+                cpop_, cden_ = '{0}{1}'.format(cpop, w), '{0}{1}'.format(cden, w)
+            else:
+                cpop_, cden_ = cpop, cden
+            df_ = df_.rename(columns={0: cpop_, 1: cden_})
+            df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
+            density_columns.extend([cpop_, cden_])
+        columns_dict['density'] = density_columns
+
+    # network clustering // community detection
+    # detect communities on the full network
+    if 'density' in feature_groups and 'normeddensity' in feature_groups:
+
+        normed_density_columns = [c + '_normed' for c in density_columns]
+
+        df_edges = project_weight(dft)
+        df_cc, rep = produce_cluster_df(df_edges, cutoff_frac=0.1, unique_edges=False, cut_nodes=False, verbose=True)
+        print('time on comm. detection {0:.3f}'.format(rep))
+        print(sum(df_cc['domain_id_up'].isnull()), sum(df_cc['domain_id_dn'].isnull()))
+        # print(df_cc.dtypes, df_cc.shape, sum(df_cc['domain_id_up'].isnull()))
+        dup, ddn = 'domain_id_up', 'domain_id_dn'
+        df_dd_cnt = df_cc.groupby([dup, ddn], group_keys=False).apply(lambda x: x['weight'].sum())
+
+        # obtain domain_up, domain_dn with 'norm' being the sum of edges between domain types
+        df_dd = df_dd_cnt.reset_index().rename(columns={0: 'norm'})
+
+        # merge df_dd back to df_cc (up, dn ,dup, ddn, weight)
+        df_cc2 = pd.merge(df_cc, df_dd, on=(dup, ddn), how='left')
+
+        df2 = pd.merge(df, df_cc2, on=(up, dn), how='left')
+        if sum(~(df2['norm'] > 0)) > 0:
+            print('break : some norms are negative')
+
+        for c, c2 in zip(density_columns, normed_density_columns):
+            df2[c2] = df2[c] / df2['norm']
+
+        columns_dict['normeddensity'] = normed_density_columns
+        df = df2
+
+    # time clustering
+    if 'cycle' in feature_groups:
         print('starting optimal clustering:')
-        df_ = df.groupby(ni).progress_apply(lambda x: cluster_optimally_pd(x[ye], 2))
-        extra_cols = set(df_.columns)
+        # naive split
+        df_ = df.groupby(ni).progress_apply(lambda x: optimal_2split_pd(x[ye]))
+        # kmeans split
+        # df_ = df.groupby(ni).progress_apply(lambda x: cluster_optimally_pd(x[ye], 2))
         df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
         print(df.head())
         print('*** value counts of {0}'.format(wi))
         print(df[wi].value_counts())
         print('*** value counts of {0}'.format(nw))
         print(df.drop_duplicates(ni)[nw].value_counts())
-        print(extra_cols)
-        present_columns += list(set(extra_cols) - set(present_columns))
+        columns_dict['cycle'] = [nw, wi, 'd0']
 
-    if cpop in present_columns:
-        print('starting current popularity estimate')
-        df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye]))
-        df_ = df_.rename(columns={0: cpop, 1: cden})
-        df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
+    columns_lists = [columns_dict[k] for k in feature_groups]
+    columns = [x for sublist in columns_lists for x in sublist]
+    columns += [ps]
 
     mask_ids = df[ni].isin(ids)
     up_dn = df.loc[mask_ids, [ni, up, dn]].drop_duplicates(ni).set_index(ni)
@@ -72,10 +126,11 @@ def main(df_type, version, present_columns,
     data_dict = {}
     notify_fraction = 0.01
     n_notify = int(ceil(notify_fraction * len(ids)))
-    print('n_notify: {0}'.format(n_notify))
+    print('n_notify (update run progress every n_notify): {0}'.format(n_notify))
+    print('present_columns: {0}'.format(columns))
 
     for idc in ids:
-        data_dict[str(idc)] = df.loc[df[ni].isin([idc]), present_columns].values.T
+        data_dict[str(idc)] = df.loc[df[ni].isin([idc]), columns].values.T
         if len(data_dict) % n_notify == 0:
             print('{0:.3f}% fraction processed. {1}'.format(100 * len(data_dict) / len(ids),
                                                             len(data_dict)))
@@ -96,7 +151,7 @@ def main(df_type, version, present_columns,
     print('products {0}'.format(sorted(list(map(lambda x: sum(x)*len(x), lens_)))))
     print('products(+1) {0}'.format(sorted(list(map(lambda x: sum(x)*(len(x)+1), lens_)))))
 
-    datatype = '_'.join(present_columns)
+    datatype = '_'.join(columns)
 
     if test_head < 0:
         with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}_c_{2}_m_{3}_'
