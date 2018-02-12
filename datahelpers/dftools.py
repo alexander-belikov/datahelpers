@@ -345,7 +345,7 @@ def count_elements_smaller_than_self_wdensity(x, window=None, right_continuous=F
         denom = full(x.values.shape, float(window))
     else:
         denom = (x.values - np.min(x))
-    dns = np.true_divide(cnts, denom, where=(denom!=0))
+    dns = np.true_divide(cnts, denom, where=(denom != 0))
     r = pd.DataFrame(vstack([cnts, dns]).T, index=x.index)
     return r
 

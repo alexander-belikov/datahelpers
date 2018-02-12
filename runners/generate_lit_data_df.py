@@ -9,9 +9,6 @@ import gzip
 from datahelpers.aux import unfold_df, find_closest_year
 from datahelpers.constants import iden, pm, ye, ai, ps, up, dn, ar, ni, cexp, qcexp, gu, nw, wi
 
-at = 'action'
-at = 'pos'
-
 df = pd.read_csv(expanduser('~/data/literome/pathway-extraction.txt.gz'), sep='\t', compression='gzip')
 
 df.rename(columns={'PMID': pm}, inplace=True)
@@ -32,11 +29,11 @@ df[dn] = df['Theme'].apply(lambda x: x.split(':')[-1])
 
 # define action type
 m = (df['Regulation Type'] == 'Positive_regulation')
-df[at] = True
-df.loc[~m, at] = False
+df[ps] = True
+df.loc[~m, ps] = False
 
 # expand families
-cols = [up, dn, at]
+cols = [up, dn, ps]
 df_tmp = df[cols]
 p, q = unfold_df(df_tmp)
 
@@ -59,6 +56,15 @@ gc.choose_converter('symbol', 'entrez_id')
 dfi2[up] = dfi2[up].apply(lambda x: gc[x])
 dfi2[dn] = dfi2[dn].apply(lambda x: gc[x])
 
+mps = 'mean_ps'
+ps_mean = dfi2.groupby([up, dn, pm]).apply(lambda x: x[ps].mean())
+dfi2_ = ps_mean.reset_index().rename(columns={0: mps})
+dfi2_[ps] = 1.0
+mask_indefinite = (dfi2_[mps] == 0.5)
+dfi2_.loc[mask_indefinite, ps] = -1
+mask_neg = (dfi2_[mps] < 0.5)
+dfi2_.loc[mask_neg, ps] = 0.0
+
 ###
 # lookup pmids from medline and merge years
 with gzip.open(expanduser('~/data/kl/raw/medline_doc_cs_4.pgz'), 'rb') as fp:
@@ -79,13 +85,13 @@ pmids2 = pd.merge(pd.DataFrame(pmids, columns=[pm]), df_pmid, how='inner', on=pm
 print('number of pmids dropped: {0}'.format(pmids.shape[0]-pmids2.shape[0]))
 
 # merge (pm-issn) onto (claims)
-dfi3 = pd.merge(dfi2, pmids2[[pm, 'issn', 'year']], on=pm, how='left')
+dfi3 = pd.merge(dfi2_, pmids2[[pm, 'issn', 'year']], on=pm, how='left')
 print('dfi3.shape: {0}'.format(dfi3.shape))
 
 dfi3 = dfi3.loc[~dfi3[ye].isnull()].copy()
 dfi3[pm] = dfi3[pm].astype(int)
 dfi3[ye] = dfi3[ye].astype(int)
-dfi3[at] = dfi3[at].astype(int)
+dfi3[ps] = dfi3[ps].astype(int)
 
 set_pmids_issns = set(df_pmid['issn'].unique())
 
@@ -149,7 +155,7 @@ dfi5[ar] = dfi5[ar].fillna(-1)
 dfi6 = dfto.get_multiplet_to_int_index(dfi5, [up, dn], ni)
 print(dfi6[ai].value_counts().head())
 
-dfi7 = dfi6[[ni, pm, up, dn, at, ye, ai, ar]].copy()
+dfi7 = dfi6[[ni, pm, up, dn, ps, ye, ai, ar]].copy()
 
 with gzip.open(expanduser('~/data/kl/claims/df_lit_6.pgz'), 'wb') as fp:
     pickle.dump(dfi7, fp)

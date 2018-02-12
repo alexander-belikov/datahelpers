@@ -11,6 +11,7 @@ from bm_support.supervised import cluster_optimally_pd, optimal_2split_pd
 from datahelpers.community_tools import produce_cluster_df, project_weight
 from datahelpers.constants import ye, ai, ps, up, dn, ar, ni, nw, wi, cpop, pm, cden
 from tqdm import tqdm, tqdm_pandas
+from hashlib import sha1
 
 
 def main(df_type, version, feature_groups,
@@ -43,6 +44,8 @@ def main(df_type, version, feature_groups,
     windows = [None, 1, 2]
     density_columns = []
 
+    rc = 'rc'
+
     if 'density' in feature_groups:
         for w in windows:
             df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye], w))
@@ -53,6 +56,16 @@ def main(df_type, version, feature_groups,
             df_ = df_.rename(columns={0: cpop_, 1: cden_})
             df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
             density_columns.extend([cpop_, cden_])
+            # do the right continuous
+            df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye], w, True))
+            if w:
+                cpop_, cden_ = '{0}{1}{2}'.format(cpop, rc, w), '{0}{1}{2}'.format(cden, rc, w)
+            else:
+                cpop_, cden_ = '{0}{1}'.format(cpop, rc), '{0}{1}'.format(cden, rc)
+            df_ = df_.rename(columns={0: cpop_, 1: cden_})
+            df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
+            density_columns.extend([cpop_, cden_])
+
         columns_dict['density'] = density_columns
 
     # network clustering // community detection
@@ -153,11 +166,23 @@ def main(df_type, version, feature_groups,
 
     datatype = '_'.join(columns)
 
+    str_to_hash = '{0}_{1}_{2}_{3}_{4}_{5}_{6}'.format(df_type, version, datatype,
+                                                        n_samples, low_bound_history_length,
+                                                        low_freq, hi_freq)
+
+    datatype_hash = int(sha1(str_to_hash.encode('utf-8')).hexdigest(), 16)
+    datatype_hash_trunc = datatype_hash % 1000000
+
     if test_head < 0:
-        with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}_c_{2}_m_{3}_'
-                                  'n_{4}_a_{5}_b_{6}.pgz'.format(df_type, version, datatype, n_samples,
-                                                                 low_bound_history_length,
-                                                                 low_freq, hi_freq)), 'wb') as fp:
+        with open(expanduser('~/data/kl/logs/generate_data_dict_runs.txt'), 'a') as f:
+            f.write('{0} : {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8}\n'.format(datatype_hash_trunc,
+                                                                 df_type, version, datatype,
+                                                                 n_samples, low_bound_history_length,
+                                                                 low_freq, hi_freq, test_head))
+
+    if test_head < 0:
+        with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}'
+                                  '_hash_{2}.pgz'.format(df_type, version, datatype_hash_trunc)), 'wb') as fp:
             pickle.dump(data_batches, fp)
 
 
