@@ -22,3 +22,4 @@ wi = 'waveindex'
 cpop = 'cpop'
 cden = 'cden'
 ct = 'cite_count'
+dist = gu
