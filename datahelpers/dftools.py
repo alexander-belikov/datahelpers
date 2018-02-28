@@ -377,15 +377,33 @@ def parse_wos_simple_format(ll, keys):
         return []
 
 
+def parse_wos_record(record, keys):
+    items = [(len(x.split(' ')[0]) == 2 and x[0] != ' ') for x in record]
+    indices = [(i, record[i].split(' ')[0]) for i, x in enumerate(items) if x]
+    indices_dict = {a[1]: (a[0], b[0])for a, b in zip(indices[:-1], indices[1:])}
+    indices_dict.update({indices[-1][1]: (indices[-1][0], len(record))})
+    rrecord = []
+    for k in keys:
+        if k in indices_dict.keys():
+            a, b = indices_dict[k]
+            if b-a == 1:
+                rrecord.append(record[a][len(k):].lstrip())
+            else:
+                r = '|'.join([record[a][len(k):].lstrip()] + [x.lstrip() for x in record[a+1:b]])
+                rrecord.append(r)
+        else:
+            rrecord.append([])
+    return rrecord
+
+
 def agg_file_info(fname, keys):
     # parsing web of science plain text dumps
     # webofknowledge.com
     lines = open(fname).read().splitlines()
     lines2 = list(group(lines, ''))
-    data = [np.array(parse_wos_simple_format(x, keys)) for x in lines2]
-    non_empty_data = list(filter(lambda x: len(x), data))
-    y = np.vstack(non_empty_data)
-    return y
+    data = [parse_wos_record(x, keys) for x in lines2]
+    data2 = list(filter(lambda x: x[0], data))
+    return data2
 
 
 def add_column_from_file(df, fpath, merge_column, merged_column, impute_mean=True):

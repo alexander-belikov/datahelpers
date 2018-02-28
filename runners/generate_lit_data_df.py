@@ -7,7 +7,17 @@ from wos_parser.parse import issn2int
 import pickle
 import gzip
 from datahelpers.aux import unfold_df, find_closest_year
-from datahelpers.constants import iden, pm, ye, ai, ps, up, dn, ar, ni, cexp, qcexp, gu, nw, wi
+from datahelpers.constants import pm, ye, ai, ps, up, dn, ar, ni
+
+full_statement_flag = True
+
+origin = 'lit'
+version = 8
+
+upstr = 'upstream'
+dnstr = 'downstream'
+rtype = 'Regulation Type'
+sentence = 'Sentence.1'
 
 df = pd.read_csv(expanduser('~/data/literome/pathway-extraction.txt.gz'), sep='\t', compression='gzip')
 
@@ -26,9 +36,11 @@ df = df[~mcut]
 
 df[up] = df['Cause'].apply(lambda x: x.split(':')[-1])
 df[dn] = df['Theme'].apply(lambda x: x.split(':')[-1])
+df[upstr] = df[up]
+df[dnstr] = df[dn]
 
 # define action type
-m = (df['Regulation Type'] == 'Positive_regulation')
+m = (df[rtype] == 'Positive_regulation')
 df[ps] = True
 df.loc[~m, ps] = False
 
@@ -40,7 +52,7 @@ p, q = unfold_df(df_tmp)
 # merge back pmids
 dfs = pd.DataFrame(q, columns=(['index'] + list(p)))
 print(dfs.shape)
-dfi2 = pd.merge(dfs, pd.DataFrame(df[pm]), left_on='index', right_index=True)
+dfi2 = pd.merge(dfs, df[[pm, rtype, sentence, upstr, dnstr]], left_on='index', right_index=True)
 print('after pmid remerge:', dfi2.shape)
 
 # convert symbols to entrez id
@@ -64,6 +76,8 @@ mask_indefinite = (dfi2_[mps] == 0.5)
 dfi2_.loc[mask_indefinite, ps] = -1
 mask_neg = (dfi2_[mps] < 0.5)
 dfi2_.loc[mask_neg, ps] = 0.0
+
+dfi2_ = dfi2_.merge(dfi2[[pm, up, dn, ps, rtype, sentence, upstr, dnstr]], on=[pm, up, dn, ps])
 
 ###
 # lookup pmids from medline and merge years
@@ -155,7 +169,11 @@ dfi5[ar] = dfi5[ar].fillna(-1)
 dfi6 = dfto.get_multiplet_to_int_index(dfi5, [up, dn], ni)
 print(dfi6[ai].value_counts().head())
 
-dfi7 = dfi6[[ni, pm, up, dn, ps, ye, ai, ar]].copy()
 
-with gzip.open(expanduser('~/data/kl/claims/df_lit_6.pgz'), 'wb') as fp:
-    pickle.dump(dfi7, fp)
+with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(origin, version)), 'wb') as fp:
+    pickle.dump(dfi6[[ni, pm, up, dn, ps, ye, ai, ar]], fp)
+
+if full_statement_flag:
+    with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}_fs.pgz'.format(origin, version)), 'wb') as fp:
+        pickle.dump(dfi6[[ni, pm, up, dn, ps, ye, ai, ar, upstr, dnstr, rtype, sentence]], fp)
+

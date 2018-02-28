@@ -63,7 +63,8 @@ def convert_to_bool(df, working_columns=[], inplace=False):
             # perhaps something more sophisticated could be
             # implemented
             dft[c] = dft[c].replace({'Y': True, 'N': False,
-                                     '1': True, '0': False})
+                                     '1': True, '0': False,
+                                     1: True, 0: False})
     return dft
 
 

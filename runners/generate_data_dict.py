@@ -4,13 +4,12 @@ from datahelpers.dftools import extract_idc_within_frequency_interval, count_ele
 import gzip
 import pickle
 from os.path import expanduser
-from datahelpers.aux import str2bool
 from numpy import ceil
 from datahelpers.partition import partition_dict_to_subsamples
 from bm_support.supervised import cluster_optimally_pd, optimal_2split_pd
 from datahelpers.community_tools import produce_cluster_df, project_weight
 from datahelpers.constants import ye, ai, ps, up, dn, ar, ni, nw, wi, cpop, pm, cden
-from tqdm import tqdm, tqdm_pandas
+from tqdm import tqdm
 from hashlib import sha1
 
 
@@ -167,8 +166,8 @@ def main(df_type, version, feature_groups,
     datatype = '_'.join(columns)
 
     str_to_hash = '{0}_{1}_{2}_{3}_{4}_{5}_{6}'.format(df_type, version, datatype,
-                                                        n_samples, low_bound_history_length,
-                                                        low_freq, hi_freq)
+                                                       n_samples, low_bound_history_length,
+                                                       low_freq, hi_freq)
 
     datatype_hash = int(sha1(str_to_hash.encode('utf-8')).hexdigest(), 16)
     datatype_hash_trunc = datatype_hash % 1000000
@@ -185,13 +184,14 @@ def main(df_type, version, feature_groups,
                                   '_hash_{2}.pgz'.format(df_type, version, datatype_hash_trunc)), 'wb') as fp:
             pickle.dump(data_batches, fp)
 
+    if test_head < 0:
+        with gzip.open(expanduser('~/data/kl/batches/df_{0}_v_{1}'
+                                  '_hash_{2}.pgz'.format(df_type, version, datatype_hash_trunc)), 'wb') as fp:
+            pickle.dump(df, fp)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-
-    # gw
-
-    # version = 1 for lit
 
     parser.add_argument('-d', '--datasource',
                         default='gw',
