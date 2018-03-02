@@ -392,7 +392,7 @@ def parse_wos_record(record, keys):
                 r = '|'.join([record[a][len(k):].lstrip()] + [x.lstrip() for x in record[a+1:b]])
                 rrecord.append(r)
         else:
-            rrecord.append([])
+            rrecord.append('')
     return rrecord
 
 

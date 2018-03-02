@@ -454,6 +454,7 @@ def bin_packing_mean(pdfs_input, number_bins, distance_func=ks_2samp):
         indices_output = [range(len(pdfs_input))]
     return indices_output
 
+
 def check_packing(list_indices, weights, pdfs, distance_func=ks_2samp_multi_dim):
     """
     return stats of the partition

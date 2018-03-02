@@ -76,10 +76,12 @@ mask_indefinite = (dfi2_[mps] == 0.5)
 dfi2_.loc[mask_indefinite, ps] = -1
 mask_neg = (dfi2_[mps] < 0.5)
 dfi2_.loc[mask_neg, ps] = 0.0
+print('*** number of unique pm, up, dn pairs: ', dfi2_.shape)
 
-dfi2_ = dfi2_.merge(dfi2[[pm, up, dn, ps, rtype, sentence, upstr, dnstr]], on=[pm, up, dn, ps])
+dfi2__ = pd.merge(dfi2_, dfi2[[pm, up, dn, ps, rtype, sentence, upstr, dnstr]], on=[pm, up, dn, ps], how='left')
+dfi2__ = dfi2__.drop_duplicates([up, dn, pm])
+print('*** number of unique pm, up, dn pairs after remerge: ', dfi2__.shape)
 
-###
 # lookup pmids from medline and merge years
 with gzip.open(expanduser('~/data/kl/raw/medline_doc_cs_4.pgz'), 'rb') as fp:
     df_pmid = pickle.load(fp)
@@ -99,7 +101,7 @@ pmids2 = pd.merge(pd.DataFrame(pmids, columns=[pm]), df_pmid, how='inner', on=pm
 print('number of pmids dropped: {0}'.format(pmids.shape[0]-pmids2.shape[0]))
 
 # merge (pm-issn) onto (claims)
-dfi3 = pd.merge(dfi2_, pmids2[[pm, 'issn', 'year']], on=pm, how='left')
+dfi3 = pd.merge(dfi2__, pmids2[[pm, 'issn', 'year']], on=pm, how='left')
 print('dfi3.shape: {0}'.format(dfi3.shape))
 
 dfi3 = dfi3.loc[~dfi3[ye].isnull()].copy()
@@ -108,8 +110,8 @@ dfi3[ye] = dfi3[ye].astype(int)
 dfi3[ps] = dfi3[ps].astype(int)
 
 set_pmids_issns = set(df_pmid['issn'].unique())
+print('*** number of unique pm, up, dn after dropping NA years', dfi3.shape)
 
-###
 # retrieve and merge issn-ye-ef-ai table (issn-ye-ai)
 df_ai = pd.read_csv(expanduser('~/data/kl/eigen/ef_ai_1990_2014.csv.gz'), index_col=0, compression='gzip')
 
@@ -148,7 +150,6 @@ df_ai = df_ai.rename(columns={'year': 'ai_year'})
 df_feature = pd.merge(df_pmid3, df_ai, left_on=['issn', 'proxy_year'], right_on=['issn', 'ai_year'])
 df_feature_cut = df_feature[['pmid', 'ai_cdf']].rename(columns={'ai_cdf': 'ai'})
 dfi4 = pd.merge(dfi3, df_feature_cut, on=pm, how='left')
-print('dfi4.shape: {0}'.format(dfi4.shape))
 
 # impute missing ai's with 0.5
 mask = (dfi4[ai].isnull())
@@ -156,9 +157,10 @@ mean_available_ai = round(dfi4.loc[~mask, ai].mean(), 2)
 print(mean_available_ai)
 print(dfi4[ai].value_counts().head())
 dfi4.loc[mask, ai] = mean_available_ai
-print('{0} ai value imputed, out of {1}. It is {2:.3f}'.format(sum(mask), mask.shape[0], sum(mask)/mask.shape[0]))
+print('{0} ai value imputed. frac {0:.3f}'.format(sum(mask), mask.shape[0], sum(mask)/mask.shape[0]))
+print('*** number of unique pm, up, dn after attaching ai: {0}'.format(dfi4.shape[0]))
 
-
+# affiliations
 df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
                       compression='gzip').rename(columns={'rating': ar})
 
@@ -168,7 +170,7 @@ dfi5[ar] = dfi5[ar].fillna(-1)
 
 dfi6 = dfto.get_multiplet_to_int_index(dfi5, [up, dn], ni)
 print(dfi6[ai].value_counts().head())
-
+print('*** number of unique pm, up, dn after attaching ar: {0}'.format(dfi6.shape[0]))
 
 with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(origin, version)), 'wb') as fp:
     pickle.dump(dfi6[[ni, pm, up, dn, ps, ye, ai, ar]], fp)

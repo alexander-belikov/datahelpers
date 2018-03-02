@@ -1,6 +1,7 @@
 from itertools import product
 import argparse
 
+
 def cut_string(x):
     if '_' in x:
         x2 = x.split('_')
