@@ -42,7 +42,8 @@ def main(df_type, version, feature_groups,
 
     windows = [None, 1, 2]
     density_columns = []
-
+    # rc stand for right continuous : meaning in the popularity of density count
+    # instead of `<` for the past statements, we use `<=`
     rc = 'rc'
 
     if 'density' in feature_groups:

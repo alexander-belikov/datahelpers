@@ -148,6 +148,8 @@ dfi4 = pd.merge(dfi3, df_feature_cut, on=pm)
 df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
                       compression='gzip').rename(columns={'rating': ar})
 
+df_affs = df_affs.drop_duplicates(pm)
+
 dfi4 = pd.merge(dfi4, df_affs, how='left', on=pm)
 
 dfi4[ar] = dfi4[ar].fillna(-1)
