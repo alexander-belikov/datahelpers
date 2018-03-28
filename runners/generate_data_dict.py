@@ -75,7 +75,7 @@ def main(df_type, version, feature_groups,
         normed_density_columns = [c + '_normed' for c in density_columns]
 
         df_edges = project_weight(dft)
-        df_cc, rep = produce_cluster_df(df_edges, cutoff_frac=0.1, unique_edges=False, cut_nodes=False, verbose=True)
+        df_cc, rep = produce_cluster_df(df_edges, cutoff_frac=0.0, unique_edges=False, cut_nodes=False, verbose=True)
         print('time on comm. detection {0:.3f}'.format(rep))
         print(sum(df_cc['domain_id_up'].isnull()), sum(df_cc['domain_id_dn'].isnull()))
         # print(df_cc.dtypes, df_cc.shape, sum(df_cc['domain_id_up'].isnull()))
@@ -95,7 +95,14 @@ def main(df_type, version, feature_groups,
         for c, c2 in zip(density_columns, normed_density_columns):
             df2[c2] = df2[c] / df2['norm']
 
-        columns_dict['normeddensity'] = normed_density_columns
+        diffuse_cluster_id = df_cc['domain_id_up'].max()
+
+        mask = (df2[dup] == diffuse_cluster_id) | (df2[ddn] == diffuse_cluster_id)
+        df2.loc[mask, 'norm'] = 0
+        df2['diffuse'] = 0.0
+        df2.loc[mask, 'diffuse'] = 1.0
+
+        columns_dict['normeddensity'] = normed_density_columns + ['norm', 'diffuse']
         df = df2
 
     # time clustering
