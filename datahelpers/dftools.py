@@ -380,7 +380,7 @@ def parse_wos_simple_format(ll, keys):
 def parse_wos_record(record, keys):
     items = [(len(x.split(' ')[0]) == 2 and x[0] != ' ') for x in record]
     indices = [(i, record[i].split(' ')[0]) for i, x in enumerate(items) if x]
-    indices_dict = {a[1]: (a[0], b[0])for a, b in zip(indices[:-1], indices[1:])}
+    indices_dict = {a[1]: (a[0], b[0]) for a, b in zip(indices[:-1], indices[1:])}
     indices_dict.update({indices[-1][1]: (indices[-1][0], len(record))})
     rrecord = []
     for k in keys:
