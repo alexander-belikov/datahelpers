@@ -71,11 +71,11 @@ def produce_cluster_df(edges_df, cutoff_frac=0.1, unique_edges=True, cut_nodes=F
         print('number of edges: {0}'.format(edges_df.shape[0]))
 
     # choose subset graph with predefined number of nodes and edges
-    ee, vv, i2p, p2i, ws = cut_edges(edges_df, nnodes=cut_nodes)
+    ee, vv, i2p, p2i, weights = cut_edges(edges_df, nnodes=cut_nodes)
     if verbose:
         print('number of edges after cutting: {0}'.format(len(ee)))
 
-    r = split_communities_cluster(ee, ws, cutoff_frac, unique_edges, verbose)
+    r = split_communities_cluster(ee, weights, cutoff_frac, unique_edges, verbose)
 
     if verbose:
         mbsp_agg, seconds = r
@@ -99,12 +99,12 @@ def produce_cluster_df(edges_df, cutoff_frac=0.1, unique_edges=True, cut_nodes=F
         return dff2
 
 
-def split_communities_cluster(ee, ws, cutoff_frac=0.1, unique_edges=True, verbose=False):
+def split_communities_cluster(edges, weights, cutoff_frac=0.1, unique_edges=True, verbose=False):
 
     if unique_edges:
-        ee = list(set([x if x[0] <= x[1] else (x[1], x[0]) for x in ee]))
+        edges = list(set([x if x[0] <= x[1] else (x[1], x[0]) for x in edges]))
     # construct graph on edges
-    g = ig.Graph(ee, directed=True)
+    g = ig.Graph(edges, directed=True)
 
     # sort connected components by size, decreasing order
     cc = sorted(g.clusters(), key=lambda x: len(x), reverse=True)
@@ -146,7 +146,7 @@ def split_communities_cluster(ee, ws, cutoff_frac=0.1, unique_edges=True, verbos
         g0 = g.subgraph(c)
 
         # {edge of g : weight} dictionary
-        w_dict = dict(zip(ee, ws))
+        w_dict = dict(zip(edges, weights))
 
         # edge order of g0
         ee_g0 = [e.tuple for e in g0.es]
