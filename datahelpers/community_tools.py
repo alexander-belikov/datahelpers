@@ -99,9 +99,18 @@ def produce_cluster_df(edges_df, cutoff_frac=0.1, unique_edges=True, cut_nodes=F
         return dff2
 
 
-def split_communities_cluster(edges, weights, cutoff_frac=0.1, unique_edges=True, verbose=False):
+def split_communities_cluster(edges, weights=None, cutoff_frac=0.1, directed=True, verbose=False):
+    """
 
-    if unique_edges:
+    :param edges: list of tuples [(a,b)]
+    :param weights: weights pof edges, the order is assumed to be the same that of edges
+    :param cutoff_frac:
+    :param directed:
+    :param verbose:
+    :return:
+    """
+
+    if not directed:
         edges = list(set([x if x[0] <= x[1] else (x[1], x[0]) for x in edges]))
     # construct graph on edges
     g = ig.Graph(edges, directed=True)
@@ -144,20 +153,22 @@ def split_communities_cluster(edges, weights, cutoff_frac=0.1, unique_edges=True
 
         # subgraph() disrespects the ids of c and creates ids from 0 conseq.
         g0 = g.subgraph(c)
-
-        # {edge of g : weight} dictionary
-        w_dict = dict(zip(edges, weights))
+        if verbose:
+            print(g0.summary())
+        dt = datetime.datetime.now()
 
         # edge order of g0
         ee_g0 = [e.tuple for e in g0.es]
 
-        # weights of g0 in the order of g0
-        w_g0 = [w_dict[(g0_node_g_node_conv[a], g0_node_g_node_conv[b])] for a, b in ee_g0]
+        if weights:
+            # {edge of g : weight} dictionary
+            w_dict = dict(zip(edges, weights))
+            # weights of g0 in the order of g0
+            w_g0 = [w_dict[(g0_node_g_node_conv[a], g0_node_g_node_conv[b])] for a, b in ee_g0]
+            communities = g0.community_infomap(edge_weights=w_g0)
+        else:
+            communities = g0.community_infomap()
 
-        if verbose:
-            print(g0.summary())
-        dt = datetime.datetime.now()
-        communities = g0.community_infomap(edge_weights=w_g0)
         dt2 = datetime.datetime.now()
         cur_seconds = (dt2 - dt).total_seconds()
         total_seconds += cur_seconds
@@ -178,3 +189,14 @@ def split_communities_cluster(edges, weights, cutoff_frac=0.1, unique_edges=True
     else:
         return mbsp_agg
 
+
+def assign_comms_to_edge_list(elist, directed=True):
+    ups = [x[0] for x in elist]
+    dns = [x[1] for x in elist]
+    uni_nodes = list(set(ups) | set(dns))
+    n_uniques = len(uni_nodes)
+    ranged = range(n_uniques)
+    conversion_map = dict(zip(uni_nodes, ranged))
+    edges_list_conv = [(conversion_map[x[0]], conversion_map[x[1]]) for x in elist]
+    g = ig.Graph(edges=edges_list_conv, directed=directed)
+    communities = g.community_infomap()

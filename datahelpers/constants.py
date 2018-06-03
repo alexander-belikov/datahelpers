@@ -25,3 +25,4 @@ ct = 'cite_count'
 aus = 'authors'
 affs = 'affs'
 dist = gu
+rdist = 'rdist'
