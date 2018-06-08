@@ -1,7 +1,8 @@
 from .constants import up, dn, ye
 import datetime
-from numpy import array
-from pandas import DataFrame
+from numpy import array, percentile
+from pandas import DataFrame, read_hdf
+from os.path import expanduser, join
 import igraph as ig
 
 
@@ -113,10 +114,11 @@ def split_communities_cluster(edges, weights=None, cutoff_frac=0.1, directed=Tru
     if not directed:
         edges = list(set([x if x[0] <= x[1] else (x[1], x[0]) for x in edges]))
     # construct graph on edges
-    g = ig.Graph(edges, directed=True)
+    g = ig.Graph(edges, directed=directed)
 
     # sort connected components by size, decreasing order
     cc = sorted(g.clusters(), key=lambda x: len(x), reverse=True)
+    print('number of connected components {0}'.format(len(cc)))
 
     # large connected components will be split into communities
     cc_to_communize = list(filter(lambda x: len(x) > cutoff_frac * len(g.vs), cc))
@@ -127,6 +129,7 @@ def split_communities_cluster(edges, weights=None, cutoff_frac=0.1, directed=Tru
     if verbose:
         print('number of nodes {0}, number of edges {1}'.format(len(g.vs), len(g.es)))
 
+        print('number of connected components {0}'.format(len(cc)))
         print('number of disconnected components with > {0} '
               'fraction of nodes : {1}'.format(cutoff_frac, len(cc_to_communize)))
         print('number of disconnected components with <= {0} '
@@ -176,10 +179,9 @@ def split_communities_cluster(edges, weights=None, cutoff_frac=0.1, directed=Tru
         mbsp_agg.extend([(g0_node_g_node_conv[k], mbsp[k] + community_count)
                          for k in g0_node_g_node_conv.keys()])
         community_count += len(communities)
-    if verbose:
-        print('{0:.2f} sec on comm detection'.format(total_seconds))
 
     if verbose:
+        print('{0:.2f} sec on comm detection'.format(total_seconds))
         print('size of communal component: {0}'.format(len(mbsp_agg)))
 
     mbsp_agg.extend([(n, community_count) for n in diffuse_component])
@@ -200,3 +202,62 @@ def assign_comms_to_edge_list(elist, directed=True):
     edges_list_conv = [(conversion_map[x[0]], conversion_map[x[1]]) for x in elist]
     g = ig.Graph(edges=edges_list_conv, directed=directed)
     communities = g.community_infomap()
+
+
+def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
+                    directed=False, weighted=False, percentile_value=None, verbose=False):
+
+    if file_format == 'matrix':
+        df = read_hdf(expanduser(full_fname))
+        ups = set(df.index)
+        dns = set(df.columns)
+        uni_nodes = list(set(ups) | set(dns))
+        n_uniques = len(uni_nodes)
+        conversion_map = dict(zip(uni_nodes, range(n_uniques)))
+        inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
+        df2 = df.rename(columns=conversion_map, index=conversion_map)
+        df2 = df2.stack()
+    elif True:
+        return None
+    else:
+        return None
+
+    if percentile_value:
+        thr = percentile(df2, percentile_value)
+        df2 = df2[df2 > thr]
+
+    g = ig.Graph(df2.index.tolist(), directed=directed)
+
+    dt = datetime.datetime.now()
+    total_seconds = 0
+    if method == 'multilevel':
+        foo = g.community_multilevel
+    elif method == 'infomap':
+        foo = g.community_infomap
+    else:
+        return None
+
+    if weighted:
+        communities = foo(weights=df2.values)
+    else:
+        communities = foo()
+
+    dt2 = datetime.datetime.now()
+    cur_seconds = (dt2 - dt).total_seconds()
+    total_seconds += cur_seconds
+    if verbose:
+        print('compute took {0} sec; number of communities: {1}'.format(total_seconds, len(communities)))
+        lens = sorted([len(c) for c in communities])
+        print('Largest 5 are {0}'.format(lens[-5:]))
+
+    comm_df = DataFrame(communities.membership, index=[v.index for v in g.vs], columns=['comm_id'])
+    comm_df = comm_df.rename(index=inv_conversion_map).sort_index()
+    directedness = 'dir' if directed else 'undir'
+    weighted = 'wei' if weighted else 'unwei'
+    prefix = full_fname.split('/')[-1].split('.')[0]
+    fout_name = '{0}_comm_{1}_{2}_{3}_{4}.csv.gz'.format(prefix, method,
+                                                           directedness, weighted,
+                                                           percentile_value)
+    comm_df.to_csv(expanduser(join(fpath_out, fout_name)), compression='gzip')
+    return cur_seconds
+
