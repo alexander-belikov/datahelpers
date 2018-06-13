@@ -206,7 +206,6 @@ def assign_comms_to_edge_list(elist, directed=True):
 
 def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
                     directed=False, weighted=False, percentile_value=None, verbose=False):
-
     if file_format == 'matrix':
         df = read_hdf(expanduser(full_fname))
         ups = set(df.index)
@@ -217,8 +216,21 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
         inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
         df2 = df.rename(columns=conversion_map, index=conversion_map)
         df2 = df2.stack()
-    elif True:
-        return None
+        df2 = df2.abs()
+        df2 = df2.replace({0: 1e-6})
+    elif file_format == 'edges':
+        df = read_hdf(expanduser(full_fname))
+        c1, c2, c3 = df.columns[:3]
+        ups = set(df[c1])
+        dns = set(df[c2])
+        uni_nodes = list(set(ups) | set(dns))
+        n_uniques = len(uni_nodes)
+        conversion_map = dict(zip(uni_nodes, range(n_uniques)))
+        inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
+        df2 = df.copy()
+        df2[c1] = df2[c1].apply(lambda x: conversion_map[x])
+        df2[c2] = df2[c2].apply(lambda x: conversion_map[x])
+        df2 = df2.set_index([c1, c2])
     else:
         return None
 
@@ -230,17 +242,21 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
 
     dt = datetime.datetime.now()
     total_seconds = 0
+
     if method == 'multilevel':
-        foo = g.community_multilevel
+        if directed:
+            raise ValueError('multilevel can not be directed')
+        if weighted:
+            communities = g.community_multilevel(weights=df2.values)
+        else:
+            communities = g.community_multilevel()
     elif method == 'infomap':
-        foo = g.community_infomap
+        if weighted:
+            communities = g.community_infomap(edge_weights=df2.values)
+        else:
+            communities = g.community_infomap()
     else:
         return None
-
-    if weighted:
-        communities = foo(weights=df2.values)
-    else:
-        communities = foo()
 
     dt2 = datetime.datetime.now()
     cur_seconds = (dt2 - dt).total_seconds()
@@ -255,9 +271,65 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
     directedness = 'dir' if directed else 'undir'
     weighted = 'wei' if weighted else 'unwei'
     prefix = full_fname.split('/')[-1].split('.')[0]
-    fout_name = '{0}_comm_{1}_{2}_{3}_{4}.csv.gz'.format(prefix, method,
-                                                           directedness, weighted,
-                                                           percentile_value)
+    fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(prefix, method,
+                                                          directedness, weighted,
+                                                          percentile_value)
     comm_df.to_csv(expanduser(join(fpath_out, fout_name)), compression='gzip')
     return cur_seconds
 
+
+def get_community_fnames_cnames(mode='lincs'):
+
+    # arguments and column generator for lincs community detection methods
+    from itertools import product
+    methods = ['multilevel', 'infomap']
+    directeds = [True, False]
+    weighteds = [True, False]
+    percentile_values = [None, 95]
+
+    if mode == 'lincs':
+        prefix = 'adj'
+    else:
+        prefix = 'edges'
+
+    if mode == 'lincs':
+        types = ['lincs']
+    elif mode[:2] == 'gw':
+        types = [mode]
+    elif mode[:3] == 'lit':
+        types = [mode]
+
+    keys = ['method', 'directed']
+    keys2 = ['weighted', 'percentile_value']
+    largs = [{k: v for k, v in zip(keys, p)} for p in product(*(methods, directeds))]
+
+    zargs = [{k: v for k, v in zip(keys2, p)} for p in zip(*(weighteds, percentile_values))]
+    fnames = [{'spec': '{0}'.format(t)} for t in types]
+
+    inv_args = {'fpath_out': '~/data/kl/comms/',
+                'file_format': 'matrix'}
+    targs = [{**z, **l, **inv_args, **t} for l, z, t in product(largs, zargs, fnames)]
+    targs2 = list(filter(lambda x: not (x['directed'] and x['method'] == 'multilevel'), targs))
+
+    if mode == 'lincs':
+        #undirected infomap on full graph fails on 16Gb
+        targs2 = list(filter(lambda x:
+                             not (x['method'] == 'infomap' and x['directed'] is False
+                                  and not x['percentile_value']), targs2))
+
+    fnames = []
+    cnames = []
+    for aa in targs2:
+        directedness = 'dir' if aa['directed'] else 'undir'
+        weighted = 'wei' if aa['weighted'] else 'unwei'
+        percentile_value = aa['percentile_value']
+        mname = 'im' if aa['method'] == 'infomap' else 'ml'
+        fout_name = '{0}_{1}_comm_{2}_{3}_{4}_p{5}.csv.gz'.format(prefix, aa['spec'],
+                                                                  aa['method'],
+                                                                  directedness, weighted,
+                                                                  percentile_value)
+        cname_full = '{0}_{1}_{2}_{3}_p{4}'.format(aa['spec'], mname, directedness,
+                                                   weighted, percentile_value)
+        fnames.append(fout_name)
+        cnames.append(cname_full)
+    return fnames, cnames
