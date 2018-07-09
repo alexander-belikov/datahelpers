@@ -205,19 +205,27 @@ def assign_comms_to_edge_list(elist, directed=True):
 
 
 def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
-                    directed=False, weighted=False, percentile_value=None, verbose=False):
+                    directed=False, weighted=False, percentile_value=None, origin=None,
+                    verbose=False):
     if file_format == 'matrix':
         df = read_hdf(expanduser(full_fname))
         ups = set(df.index)
         dns = set(df.columns)
+        if verbose:
+            print('max of ups: {0}; max of dns: {1}'.format(max(list(ups)), max(list(dns))))
         uni_nodes = list(set(ups) | set(dns))
         n_uniques = len(uni_nodes)
         conversion_map = dict(zip(uni_nodes, range(n_uniques)))
         inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
         df2 = df.rename(columns=conversion_map, index=conversion_map)
+        if verbose:
+            print('max of renamed columns: {0}; max of renamed index: {1}'.format(max(df2.columns),
+                                                                                  max(df2.index)))
         df2 = df2.stack()
         df2 = df2.abs()
         df2 = df2.replace({0: 1e-6})
+        if verbose:
+            print(df2.head())
     elif file_format == 'edges':
         df = read_hdf(expanduser(full_fname))
         c1, c2, c3 = df.columns[:3]
@@ -265,15 +273,22 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
         print('compute took {0} sec; number of communities: {1}'.format(total_seconds, len(communities)))
         lens = sorted([len(c) for c in communities])
         print('Largest 5 are {0}'.format(lens[-5:]))
-
+        print('3 top elements from 3 comms are {0}'.format([x for x in communities.membership[:3]]))
+        print('3 top vertices are {0}'.format([x for x in g.vs[:3]]))
     comm_df = DataFrame(communities.membership, index=[v.index for v in g.vs], columns=['comm_id'])
+    if verbose:
+        print('comm_df index max : {0}'.format(comm_df.index.max()))
     comm_df = comm_df.rename(index=inv_conversion_map).sort_index()
+    if verbose:
+        print('comm_df index max : {0}'.format(comm_df.index.max()))
+        print('comm_df head : {0}'.format(comm_df.head()))
+        print('comm_df tail : {0}'.format(comm_df.tail()))
     directedness = 'dir' if directed else 'undir'
     weighted = 'wei' if weighted else 'unwei'
     prefix = full_fname.split('/')[-1].split('.')[0]
-    fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(prefix, method,
-                                                          directedness, weighted,
-                                                          percentile_value)
+    fout_name = '{0}_{1}_comm_{2}_{3}_{4}_p{5}.csv.gz'.format(prefix, origin, method,
+                                                              directedness, weighted,
+                                                              percentile_value)
     comm_df.to_csv(expanduser(join(fpath_out, fout_name)), compression='gzip')
     return cur_seconds
 
@@ -289,6 +304,7 @@ def get_community_fnames_cnames(mode='lincs'):
 
     if mode == 'lincs':
         prefix = 'adj'
+        prefix = 'adj_mat_all_pert_types'
     else:
         prefix = 'edges'
 
@@ -304,11 +320,11 @@ def get_community_fnames_cnames(mode='lincs'):
     largs = [{k: v for k, v in zip(keys, p)} for p in product(*(methods, directeds))]
 
     zargs = [{k: v for k, v in zip(keys2, p)} for p in zip(*(weighteds, percentile_values))]
-    fnames = [{'spec': '{0}'.format(t)} for t in types]
+    origins = [{'origin': '{0}'.format(t)} for t in types]
 
     inv_args = {'fpath_out': '~/data/kl/comms/',
                 'file_format': 'matrix'}
-    targs = [{**z, **l, **inv_args, **t} for l, z, t in product(largs, zargs, fnames)]
+    targs = [{**z, **l, **inv_args, **t} for l, z, t in product(largs, zargs, origins)]
     targs2 = list(filter(lambda x: not (x['directed'] and x['method'] == 'multilevel'), targs))
 
     if mode == 'lincs':
@@ -324,12 +340,13 @@ def get_community_fnames_cnames(mode='lincs'):
         weighted = 'wei' if aa['weighted'] else 'unwei'
         percentile_value = aa['percentile_value']
         mname = 'im' if aa['method'] == 'infomap' else 'ml'
-        fout_name = '{0}_{1}_comm_{2}_{3}_{4}_p{5}.csv.gz'.format(prefix, aa['spec'],
+        fout_name = '{0}_{1}_comm_{2}_{3}_{4}_p{5}.csv.gz'.format(prefix, aa['origin'],
                                                                   aa['method'],
                                                                   directedness, weighted,
                                                                   percentile_value)
-        cname_full = '{0}_{1}_{2}_{3}_p{4}'.format(aa['spec'], mname, directedness,
-                                                   weighted, percentile_value)
+        cname_full = '{0}_{1}_comm_{2}_{3}_{4}_p{5}'.format(prefix, aa['origin'], mname, directedness,
+                                                            weighted, percentile_value)
+
         fnames.append(fout_name)
         cnames.append(cname_full)
     return fnames, cnames
