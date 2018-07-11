@@ -1,7 +1,7 @@
 from .constants import up, dn, ye
 import datetime
 from numpy import array, percentile
-from pandas import DataFrame, read_hdf
+from pandas import DataFrame, read_hdf, concat
 from os.path import expanduser, join
 import igraph as ig
 
@@ -204,9 +204,66 @@ def assign_comms_to_edge_list(elist, directed=True):
     communities = g.community_infomap()
 
 
+def prepare_graph(full_fname, file_format='matrix',
+                  directed=False, percentile_value=None,
+                  verbose=False):
+    if file_format == 'matrix':
+        df = read_hdf(expanduser(full_fname))
+        ups = set(df.index)
+        dns = set(df.columns)
+        if verbose:
+            print('max of ups: {0}; max of dns: {1}'.format(max(list(ups)), max(list(dns))))
+        uni_nodes = list(set(ups) | set(dns))
+        n_uniques = len(uni_nodes)
+        conversion_map = dict(zip(uni_nodes, range(n_uniques)))
+        inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
+        df2 = df.rename(columns=conversion_map, index=conversion_map)
+        if verbose:
+            print('max of renamed columns: {0}; max of renamed index: {1}'.format(max(df2.columns),
+                                                                                  max(df2.index)))
+        df2 = df2.stack()
+        df2 = df2.abs()
+        df2 = df2.replace({0: 1e-6})
+        if verbose:
+            print(df2.head())
+    elif file_format == 'edges':
+        if isinstance(full_fname, str) and not isinstance(full_fname, list):
+            df = read_hdf(expanduser(full_fname))
+            c1, c2, c3 = df.columns[:3]
+        elif isinstance(full_fname, list) and not isinstance(full_fname, str):
+            df = []
+            for f in full_fname:
+                df.append(read_hdf(expanduser(f)))
+            df = concat(df)
+            c1, c2, c3 = df.columns[:3]
+            df = df.groupby([c1, c2]).apply(lambda x: x.loc[:, c3].max()).reset_index()
+
+        ups = set(df[c1])
+        dns = set(df[c2])
+        uni_nodes = list(set(ups) | set(dns))
+        n_uniques = len(uni_nodes)
+        conversion_map = dict(zip(uni_nodes, range(n_uniques)))
+        inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
+        df2 = df.copy()
+        df2[c1] = df2[c1].apply(lambda x: conversion_map[x])
+        df2[c2] = df2[c2].apply(lambda x: conversion_map[x])
+        df2 = df2.set_index([c1, c2])
+    else:
+        return None
+    if percentile_value:
+        thr = percentile(df2, percentile_value)
+        df2 = df2[df2 > thr]
+
+    es, ws = df2.index.tolist(), df2.values
+    g = ig.Graph(es, directed=directed)
+
+    return g, ws, inv_conversion_map
+
+
 def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
                     directed=False, weighted=False, percentile_value=None, origin=None,
                     verbose=False):
+    """
     if file_format == 'matrix':
         df = read_hdf(expanduser(full_fname))
         ups = set(df.index)
@@ -247,7 +304,9 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
         df2 = df2[df2 > thr]
 
     g = ig.Graph(df2.index.tolist(), directed=directed)
-
+    """
+    g, ws, inv_conversion_map = prepare_graph(full_fname, file_format,
+                                          directed, percentile_value, verbose)
     dt = datetime.datetime.now()
     total_seconds = 0
 
@@ -255,12 +314,12 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
         if directed:
             raise ValueError('multilevel can not be directed')
         if weighted:
-            communities = g.community_multilevel(weights=df2.values)
+            communities = g.community_multilevel(weights=ws)
         else:
             communities = g.community_multilevel()
     elif method == 'infomap':
         if weighted:
-            communities = g.community_infomap(edge_weights=df2.values)
+            communities = g.community_infomap(edge_weights=ws)
         else:
             communities = g.community_infomap()
     else:
@@ -285,10 +344,13 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
         print('comm_df tail : {0}'.format(comm_df.tail()))
     directedness = 'dir' if directed else 'undir'
     weighted = 'wei' if weighted else 'unwei'
-    prefix = full_fname.split('/')[-1].split('.')[0]
-    fout_name = '{0}_{1}_comm_{2}_{3}_{4}_p{5}.csv.gz'.format(prefix, origin, method,
-                                                              directedness, weighted,
-                                                              percentile_value)
+    # if isinstance(full_fname, str) and not isinstance(full_fname, list):
+    #     prefix = full_fname.split('/')[-1].split('.')[0]
+    # else:
+    #     prefix = full_fname[0].split('/')[-1].split('.')[0]
+    fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(origin, method,
+                                                          directedness, weighted,
+                                                          percentile_value)
     comm_df.to_csv(expanduser(join(fpath_out, fout_name)), compression='gzip')
     return cur_seconds
 
@@ -303,16 +365,12 @@ def get_community_fnames_cnames(mode='lincs'):
     percentile_values = [None, 95]
 
     if mode == 'lincs':
-        prefix = 'adj'
-        prefix = 'adj_mat_all_pert_types'
-    else:
-        prefix = 'edges'
-
-    if mode == 'lincs':
         types = ['lincs']
     elif mode[:2] == 'gw':
         types = [mode]
     elif mode[:3] == 'lit':
+        types = [mode]
+    else:
         types = [mode]
 
     keys = ['method', 'directed']
@@ -340,12 +398,11 @@ def get_community_fnames_cnames(mode='lincs'):
         weighted = 'wei' if aa['weighted'] else 'unwei'
         percentile_value = aa['percentile_value']
         mname = 'im' if aa['method'] == 'infomap' else 'ml'
-        fout_name = '{0}_{1}_comm_{2}_{3}_{4}_p{5}.csv.gz'.format(prefix, aa['origin'],
-                                                                  aa['method'],
-                                                                  directedness, weighted,
-                                                                  percentile_value)
-        cname_full = '{0}_{1}_comm_{2}_{3}_{4}_p{5}'.format(prefix, aa['origin'], mname, directedness,
-                                                            weighted, percentile_value)
+        fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(aa['origin'], aa['method'],
+                                                              directedness, weighted,
+                                                              percentile_value)
+        cname_full = '{0}_comm_{1}_{2}_{3}_p{4}'.format(aa['origin'], mname, directedness,
+                                                        weighted, percentile_value)
 
         fnames.append(fout_name)
         cnames.append(cname_full)
