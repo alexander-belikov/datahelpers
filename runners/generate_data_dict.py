@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 from datahelpers.dftools import extract_idc_within_frequency_interval, count_elements_smaller_than_self_wdensity
+from datahelpers.dftools import calculate_uniformity_ks
 import gzip
 import pickle
 from os.path import expanduser
@@ -40,33 +41,29 @@ def main(df_type, version, feature_groups,
 
     tqdm.pandas(tqdm())
 
-    windows = [None, 1, 2]
+    windows = [None, 1, 2, 3]
+    right_conts = [False, True]
     density_columns = []
-    # rc stand for right continuous : meaning in the popularity of density count
+    # rc stand for right continuous : in the popularity count
     # instead of `<` for the past statements, we use `<=`
-    rc = 'rc'
 
     if 'density' in feature_groups:
         for w in windows:
-            df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye], w))
-            if w:
-                cpop_, cden_ = '{0}{1}'.format(cpop, w), '{0}{1}'.format(cden, w)
-            else:
-                cpop_, cden_ = cpop, cden
-            df_ = df_.rename(columns={0: cpop_, 1: cden_})
-            df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
-            density_columns.extend([cpop_, cden_])
-            # do the right continuous
-            df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye], w, True))
-            if w:
-                cpop_, cden_ = '{0}{1}{2}'.format(cpop, rc, w), '{0}{1}{2}'.format(cden, rc, w)
-            else:
-                cpop_, cden_ = '{0}{1}'.format(cpop, rc), '{0}{1}'.format(cden, rc)
-            df_ = df_.rename(columns={0: cpop_, 1: cden_})
-            df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
-            density_columns.extend([cpop_, cden_])
+            for rc_flag in right_conts:
+                df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye],
+                                                                                                        w, rc_flag))
+                df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
+                density_columns.extend([df_.columns])
 
-        columns_dict['density'] = density_columns
+    ks_columns = []
+    if 'ksst' in feature_groups:
+        for w in windows:
+            for rc_flag in right_conts:
+                df_ = df.groupby(ni).progress_apply(lambda x: calculate_uniformity_ks(x[ye], w, rc_flag))
+                df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
+                ks_columns.extend([df_.columns])
+
+    columns_dict['density'] = density_columns + ks_columns
 
     # network clustering // community detection
     # detect communities on the full network
@@ -183,9 +180,9 @@ def main(df_type, version, feature_groups,
     if test_head < 0:
         with open(expanduser('~/data/kl/logs/generate_data_dict_runs.txt'), 'a') as f:
             f.write('{0} : {1} | {2} | {3} | {4} | {5} | {6} | {7} | {8}\n'.format(datatype_hash_trunc,
-                                                                 df_type, version, datatype,
-                                                                 n_samples, low_bound_history_length,
-                                                                 low_freq, hi_freq, test_head))
+                                                                                   df_type, version, datatype,
+                                                                                   n_samples, low_bound_history_length,
+                                                                                   low_freq, hi_freq, test_head))
 
     if test_head < 0:
         with gzip.open(expanduser('~/data/kl/batches/data_batches_{0}_v_{1}'
@@ -193,10 +190,9 @@ def main(df_type, version, feature_groups,
             pickle.dump(data_batches, fp)
 
     if test_head < 0:
-        with gzip.open(expanduser('~/data/kl/batches/df_{0}_v_{1}'
-                                  '_hash_{2}.pgz'.format(df_type, version, datatype_hash_trunc)), 'wb') as fp:
-            pickle.dump(df, fp)
-
+        fname = '~/data/kl/batches/df_{0}_v_{1}_hash_{2}.pgz'.format(df_type, version, datatype_hash_trunc)
+        store = pd.HDFStore(fname)
+        store.put('df', df)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

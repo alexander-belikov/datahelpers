@@ -2,7 +2,10 @@ import pandas as pd
 import numpy as np
 from numpy import concatenate, argsort, cumsum, repeat, unique, vstack, full
 from .constants import protein_cols, triplet_index_cols, integer_agg_index
+from datahelpers.constants import ye, cpop, cden
 from .collapse import regexp_reduce_yield_agg_dict
+from scipy.stats import kstest, uniform
+from datahelpers.collapse import collapse_df
 
 
 def analyze_unique(df, column):
@@ -197,7 +200,7 @@ def process_df_index(dft0, index_cols=triplet_index_cols, int_index_name=integer
     return df2
 
 
-def regexp_collapse_protein_cols(dft0, collapse_df=True, regexp_columns=protein_cols):
+def regexp_collapse_protein_cols(dft0, collapse_df_flag=True, regexp_columns=protein_cols):
     """
 
     :param dft0: initial DataFrame
@@ -210,7 +213,7 @@ def regexp_collapse_protein_cols(dft0, collapse_df=True, regexp_columns=protein_
     df, dd, dd_regexp = regexp_reduce_yield_agg_dict(df, regexp_columns)
     df_dd = {}
 
-    if collapse_df:
+    if collapse_df_flag:
         for c in protein_cols:
             df_dd[c] = dd
         df, dd_dd = collapse_df(df, str_dicts=df_dd, working_columns=regexp_columns)
@@ -322,7 +325,7 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
 
 
 def count_elements_smaller_than_self(x, window=None, right_continuous=False):
-    ii = argsort(x)
+    ii = argsort(x.values)
     ii2 = argsort(ii)
     uniques, counts = unique(x, return_counts=True)
     if window and window >= 0:
@@ -340,14 +343,79 @@ def count_elements_smaller_than_self(x, window=None, right_continuous=False):
 
 
 def count_elements_smaller_than_self_wdensity(x, window=None, right_continuous=False):
-    cnts = count_elements_smaller_than_self(x.values, window, right_continuous)
+    cnts = count_elements_smaller_than_self(x, window, right_continuous)
     if window and window > 0:
         denom = full(x.values.shape, float(window))
     else:
         denom = (x.values - np.min(x))
     dns = np.true_divide(cnts, denom, where=(denom != 0))
-    r = pd.DataFrame(vstack([cnts, dns]).T, index=x.index)
-    return r
+    if right_continuous:
+        rc = 'rc'
+    else:
+        rc = ''
+    if window:
+        cpop_, cden_ = '{0}{1}{2}'.format(cpop, rc, window), '{0}{1}{2}'.format(cden, rc, window)
+    else:
+        cpop_, cden_ = '{0}{1}'.format(cpop, rc), '{0}{1}'.format(cden, rc)
+    dfr = pd.DataFrame(vstack([cnts, dns]).T, index=x.index, columns=[cpop_, cden_])
+    return dfr
+
+
+def calculate_uniformity_ks(cdata, window=None, right_continuous=False):
+    """
+
+    :param cdata: Series, with values that are discreet years nad
+    :param window:
+    :param right_continuous:
+    :return:
+    """
+    ii = argsort(cdata.values)
+    ii2 = argsort(ii)
+    uniques, counts = unique(cdata, return_counts=True)
+    cyears = sorted(uniques)
+    min_ye = cdata.min()
+    agg_ks = []
+    for y in cyears:
+        if y == min_ye:
+            test_stat = 0., 1.
+        else:
+            if window and window >= 0:
+                lbound = max([min_ye, y - window])
+                if right_continuous:
+                    data = cdata[(cdata <= y) & (cdata > y-window)].values
+                else:
+                    data = cdata[(cdata < y) & (cdata > y-window)].values
+            else:
+                lbound = min_ye
+                if right_continuous:
+                    data = cdata[cdata <= y].values
+                else:
+                    data = cdata[cdata < y].values
+            if data.shape[0] > 0:
+                test_stat = kstest(data, uniform(loc=lbound, scale=y-lbound).cdf)
+            else:
+                test_stat = 0., 1.
+        agg_ks.append(test_stat[0])
+    vals = concatenate([repeat(i, c) for i, c in zip(agg_ks, counts)])
+    vals = vals[ii2]
+
+    #NB for discreet data, e.g. years. ks p value goes down with the size of the sample
+    # it does not like the discreet nature
+    # ksst -> 0 very uniform k-> infy
+
+    if right_continuous:
+        rc = 'rc'
+    else:
+        rc = ''
+    if window:
+        cname = '{0}{1}{2}'.format('ksst', rc, window)
+    else:
+        cname = '{0}{1}'.format('ksst', rc)
+    dfr = pd.DataFrame(vals, index=cdata.index, columns=[cname])
+
+    # dfks = pd.DataFrame(agg_ks, columns=[ye, cname])
+    # dfr = pd.merge(x.reset_index(), dfks, how='left', on=ye).set_index('index').rename_axis(None)[[cname]]
+    return dfr
 
 
 def group(seq, sep):
@@ -408,7 +476,7 @@ def agg_file_info(fname, keys):
 
 def add_column_from_file(df, fpath, merge_column, merged_column, impute_mean=True):
     df_cite = pd.read_csv(fpath, compression='gzip', index_col=None)
-    print(df_cite.shape)
+    # print(df_cite.shape)
     df2 = pd.merge(df, df_cite, on=merge_column, how='left')
     df_out = df2.copy()
     if impute_mean:
