@@ -263,50 +263,8 @@ def prepare_graph(full_fname, file_format='matrix',
 def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
                     directed=False, weighted=False, percentile_value=None, origin=None,
                     verbose=False):
-    """
-    if file_format == 'matrix':
-        df = read_hdf(expanduser(full_fname))
-        ups = set(df.index)
-        dns = set(df.columns)
-        if verbose:
-            print('max of ups: {0}; max of dns: {1}'.format(max(list(ups)), max(list(dns))))
-        uni_nodes = list(set(ups) | set(dns))
-        n_uniques = len(uni_nodes)
-        conversion_map = dict(zip(uni_nodes, range(n_uniques)))
-        inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
-        df2 = df.rename(columns=conversion_map, index=conversion_map)
-        if verbose:
-            print('max of renamed columns: {0}; max of renamed index: {1}'.format(max(df2.columns),
-                                                                                  max(df2.index)))
-        df2 = df2.stack()
-        df2 = df2.abs()
-        df2 = df2.replace({0: 1e-6})
-        if verbose:
-            print(df2.head())
-    elif file_format == 'edges':
-        df = read_hdf(expanduser(full_fname))
-        c1, c2, c3 = df.columns[:3]
-        ups = set(df[c1])
-        dns = set(df[c2])
-        uni_nodes = list(set(ups) | set(dns))
-        n_uniques = len(uni_nodes)
-        conversion_map = dict(zip(uni_nodes, range(n_uniques)))
-        inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
-        df2 = df.copy()
-        df2[c1] = df2[c1].apply(lambda x: conversion_map[x])
-        df2[c2] = df2[c2].apply(lambda x: conversion_map[x])
-        df2 = df2.set_index([c1, c2])
-    else:
-        return None
-
-    if percentile_value:
-        thr = percentile(df2, percentile_value)
-        df2 = df2[df2 > thr]
-
-    g = ig.Graph(df2.index.tolist(), directed=directed)
-    """
     g, ws, inv_conversion_map = prepare_graph(full_fname, file_format,
-                                          directed, percentile_value, verbose)
+                                              directed, percentile_value, verbose)
     dt = datetime.datetime.now()
     total_seconds = 0
 

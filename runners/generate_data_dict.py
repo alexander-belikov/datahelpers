@@ -53,7 +53,9 @@ def main(df_type, version, feature_groups,
                 df_ = df.groupby(ni).progress_apply(lambda x: count_elements_smaller_than_self_wdensity(x[ye],
                                                                                                         w, rc_flag))
                 df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
-                density_columns.extend([df_.columns])
+                density_columns.extend(list(df_.columns))
+
+    columns_dict['density'] = density_columns
 
     ks_columns = []
     if 'ksst' in feature_groups:
@@ -61,9 +63,9 @@ def main(df_type, version, feature_groups,
             for rc_flag in right_conts:
                 df_ = df.groupby(ni).progress_apply(lambda x: calculate_uniformity_ks(x[ye], w, rc_flag))
                 df = pd.merge(df, df_, how='left', left_index=True, right_index=True)
-                ks_columns.extend([df_.columns])
+                ks_columns.extend(list(df_.columns))
 
-    columns_dict['density'] = density_columns + ks_columns
+    columns_dict['ksst'] = ks_columns
 
     # network clustering // community detection
     # detect communities on the full network
@@ -190,7 +192,7 @@ def main(df_type, version, feature_groups,
             pickle.dump(data_batches, fp)
 
     if test_head < 0:
-        fname = '~/data/kl/batches/df_{0}_v_{1}_hash_{2}.pgz'.format(df_type, version, datatype_hash_trunc)
+        fname = expanduser('~/data/kl/batches/df_{0}_v_{1}_hash_{2}.h5'.format(df_type, version, datatype_hash_trunc))
         store = pd.HDFStore(fname)
         store.put('df', df)
 
