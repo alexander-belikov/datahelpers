@@ -1,7 +1,7 @@
 from .constants import up, dn, ye
 import datetime
 from numpy import array, percentile
-from pandas import DataFrame, read_hdf, concat
+from pandas import DataFrame, read_hdf, concat, HDFStore
 from os.path import expanduser, join
 import igraph as ig
 
@@ -204,40 +204,41 @@ def assign_comms_to_edge_list(elist, directed=True):
     communities = g.community_infomap()
 
 
-def prepare_graph(full_fname, file_format='matrix',
-                  directed=False, percentile_value=None,
-                  verbose=False):
-    if file_format == 'matrix':
-        df = read_hdf(expanduser(full_fname))
-        ups = set(df.index)
-        dns = set(df.columns)
-        if verbose:
-            print('max of ups: {0}; max of dns: {1}'.format(max(list(ups)), max(list(dns))))
-        uni_nodes = list(set(ups) | set(dns))
-        n_uniques = len(uni_nodes)
-        conversion_map = dict(zip(uni_nodes, range(n_uniques)))
-        inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
-        df2 = df.rename(columns=conversion_map, index=conversion_map)
-        if verbose:
-            print('max of renamed columns: {0}; max of renamed index: {1}'.format(max(df2.columns),
-                                                                                  max(df2.index)))
-        df2 = df2.stack()
-        df2 = df2.abs()
-        df2 = df2.replace({0: 1e-6})
-        if verbose:
-            print(df2.head())
-    elif file_format == 'edges':
-        if isinstance(full_fname, str) and not isinstance(full_fname, list):
-            df = read_hdf(expanduser(full_fname))
-            c1, c2, c3 = df.columns[:3]
-        elif isinstance(full_fname, list) and not isinstance(full_fname, str):
-            df = []
-            for f in full_fname:
-                df.append(read_hdf(expanduser(f)))
-            df = concat(df)
-            c1, c2, c3 = df.columns[:3]
-            df = df.groupby([c1, c2]).apply(lambda x: x.loc[:, c3].max()).reset_index()
+def prepare_graph_from_df(df, file_format='matrix',
+                          directed=False, percentile_value=None, verbose=False):
 
+    """
+    given a DataFrame in either edges or adj matrix format spit out a igraph
+    :param df:
+    :param file_format:
+    :param directed:
+    :param percentile_value:
+    :param multi_flag:
+    :param verbose:
+    :return:
+    """
+
+    if file_format == 'matrix':
+            ups = set(df.index)
+            dns = set(df.columns)
+            if verbose:
+                print('max of ups: {0}; max of dns: {1}'.format(max(list(ups)), max(list(dns))))
+            uni_nodes = list(set(ups) | set(dns))
+            n_uniques = len(uni_nodes)
+            conversion_map = dict(zip(uni_nodes, range(n_uniques)))
+            inv_conversion_map = dict(zip(range(n_uniques), uni_nodes))
+            df2 = df.rename(columns=conversion_map, index=conversion_map)
+            if verbose:
+                print('max of renamed columns: {0}; max of renamed index: {1}'.format(max(df2.columns),
+                                                                                      max(df2.index)))
+            df2 = df2.stack()
+            df2 = df2.abs()
+            df2 = df2.replace({0: 1e-6})
+            if verbose:
+                print(df2.head())
+    elif file_format == 'edges':
+        c1, c2, c3 = df.columns[:3]
+        df = df.groupby([c1, c2]).apply(lambda x: x.loc[:, c3].max()).reset_index()
         ups = set(df[c1])
         dns = set(df[c2])
         uni_nodes = list(set(ups) | set(dns))
@@ -250,6 +251,7 @@ def prepare_graph(full_fname, file_format='matrix',
         df2 = df2.set_index([c1, c2])
     else:
         return None
+
     if percentile_value:
         thr = percentile(df2, percentile_value)
         df2 = df2[df2 > thr]
@@ -260,11 +262,47 @@ def prepare_graph(full_fname, file_format='matrix',
     return g, ws, inv_conversion_map
 
 
-def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
-                    directed=False, weighted=False, percentile_value=None, origin=None,
-                    verbose=False):
-    g, ws, inv_conversion_map = prepare_graph(full_fname, file_format,
-                                              directed, percentile_value, verbose)
+def prepare_graphdf(full_fname, file_format='matrix', key_hdf_store=False, verbose=False):
+    if file_format == 'matrix':
+        df = read_hdf(expanduser(full_fname))
+    elif file_format == 'edges':
+        if isinstance(full_fname, str) and not isinstance(full_fname, list):
+            if key_hdf_store:
+                store = HDFStore(expanduser(full_fname))
+                keys = store.keys()
+                str_key = [k for k in keys if str(key_hdf_store) in k][0]
+                df = read_hdf(expanduser(full_fname), key=str_key)
+            else:
+                df = read_hdf(expanduser(full_fname))
+        elif isinstance(full_fname, list) and not isinstance(full_fname, str):
+            df = []
+            for f in full_fname:
+                if key_hdf_store:
+                    store = HDFStore(expanduser(f))
+                    keys = store.keys()
+                    str_keys = [k for k in keys if str(key_hdf_store) in k]
+                    if str_keys:
+                        df_ = read_hdf(expanduser(f), key=str_keys[0])
+                    else:
+                        df_ = DataFrame()
+                    store.close()
+                    if verbose:
+                        print('opened {0} by key {1}. Shape is {2}'.format(f, key_hdf_store, df_.shape))
+                else:
+                    df_ = read_hdf(expanduser(f))
+                df.append(df_)
+            df = concat(df)
+        else:
+            df = None
+    else:
+        df = None
+    return df
+
+
+def graph_to_comms(g, ws, inv_conversion_map, fpath_out, method='multilevel',
+                   directed=False, weighted=False, percentile_value=None, origin=None,
+                   key_hdf_store=False, verbose=False):
+
     dt = datetime.datetime.now()
     total_seconds = 0
 
@@ -306,11 +344,33 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
     #     prefix = full_fname.split('/')[-1].split('.')[0]
     # else:
     #     prefix = full_fname[0].split('/')[-1].split('.')[0]
-    fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(origin, method,
-                                                          directedness, weighted,
-                                                          percentile_value)
-    comm_df.to_csv(expanduser(join(fpath_out, fout_name)), compression='gzip')
+    if key_hdf_store:
+        h5_fname = '{0}_comm_{1}_{2}_{3}_p{4}.h5'.format(origin, method,
+                                                         directedness, weighted, percentile_value)
+        if verbose:
+            print('putting comms to {0}'.format(expanduser(join(fpath_out, h5_fname))))
+        store = HDFStore(expanduser(join(fpath_out, h5_fname)))
+        store.put('y{0}'.format(key_hdf_store), comm_df, format='t')
+        store.close()
+    else:
+        fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(origin, method,
+                                                              directedness, weighted,
+                                                              percentile_value)
+        if verbose:
+            print('putting comms to {0}'.format(fout_name))
+        comm_df.to_csv(expanduser(join(fpath_out, fout_name)), compression='gzip')
     return cur_seconds
+
+
+def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
+                    directed=False, weighted=False, percentile_value=None, origin=None,
+                    key_hdf_store=False, verbose=False):
+    df = prepare_graphdf(full_fname, file_format, key_hdf_store, verbose)
+
+    g, ws, inv_conversion_map = prepare_graph_from_df(df, file_format, directed, percentile_value,
+                                                      verbose)
+    graph_to_comms(g, ws, inv_conversion_map, fpath_out, method, directed, weighted,
+                   percentile_value, origin, key_hdf_store, verbose)
 
 
 def get_community_fnames_cnames(mode='lincs'):
