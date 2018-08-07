@@ -34,6 +34,6 @@ setup(
         'pymysql', 'pandas',
         'setuptools', 'PyWavelets',
         'matplotlib', 'seaborn',
-        'pathos', 'Levenstein'],
+        'pathos', 'python-Levenstein'],
     include_dirs=[np.get_include()]
 )

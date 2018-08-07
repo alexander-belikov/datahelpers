@@ -1,5 +1,6 @@
 from .constants import up, dn, ye
 import datetime
+from itertools import product
 from numpy import array, percentile
 from pandas import DataFrame, read_hdf, concat, HDFStore
 from os.path import expanduser, join
@@ -350,7 +351,7 @@ def graph_to_comms(g, ws, inv_conversion_map, fpath_out, method='multilevel',
         if verbose:
             print('putting comms to {0}'.format(expanduser(join(fpath_out, h5_fname))))
         store = HDFStore(expanduser(join(fpath_out, h5_fname)))
-        store.put('y{0}'.format(key_hdf_store), comm_df, format='t')
+        store.put('{0}'.format(key_hdf_store), comm_df, format='t')
         store.close()
     else:
         fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(origin, method,
@@ -369,14 +370,48 @@ def calculate_comms(full_fname, fpath_out, file_format='matrix', method='multile
 
     g, ws, inv_conversion_map = prepare_graph_from_df(df, file_format, directed, percentile_value,
                                                       verbose)
-    graph_to_comms(g, ws, inv_conversion_map, fpath_out, method, directed, weighted,
-                   percentile_value, origin, key_hdf_store, verbose)
+    dt = graph_to_comms(g, ws, inv_conversion_map, fpath_out, method, directed, weighted,
+                        percentile_value, origin, key_hdf_store, verbose)
+    return dt
 
 
-def get_community_fnames_cnames(mode='lincs'):
+#TODO rewrite using decorators
+def meta_calculate_comms(full_fname, fpath_out, file_format='matrix', method='multilevel',
+                         directed=False, weighted=False, percentile_value=None, origin=None,
+                         run_over_keys_flag=False, verbose=False):
+    if verbose:
+        print('run over keys flag: {0}'.format(run_over_keys_flag))
+    if run_over_keys_flag:
+        # fetch all keys from potentially a list of files in full_fname
+        # and loop over them
+        set_keys = set()
+        for f in full_fname:
+            store = HDFStore(expanduser(f))
+            set_keys |= set(store.keys())
+            store.close()
+        keys = sorted(list(set_keys))
+        tot = 0
+        for k in keys[:]:
+            # key corresponds to year, so truncate the prefix
+            kval = 'y' + k[-4:]
+            dt = calculate_comms(full_fname, fpath_out, file_format, method,
+                                 directed, weighted, percentile_value, origin, kval, verbose)
+            tot += dt
+    else:
+        tot = calculate_comms(full_fname, fpath_out, file_format, method,
+                              directed, weighted, percentile_value, origin,
+                              run_over_keys_flag, verbose)
+    return tot
+
+
+def get_community_fnames_cnames(mode='lincs', storage_type='csv.gz'):
+
+    if storage_type != 'csv.gz':
+        suffix = '_dyn'
+    else:
+        suffix = ''
 
     # arguments and column generator for lincs community detection methods
-    from itertools import product
     methods = ['multilevel', 'infomap']
     directeds = [True, False]
     weighteds = [True, False]
@@ -416,11 +451,11 @@ def get_community_fnames_cnames(mode='lincs'):
         weighted = 'wei' if aa['weighted'] else 'unwei'
         percentile_value = aa['percentile_value']
         mname = 'im' if aa['method'] == 'infomap' else 'ml'
-        fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.csv.gz'.format(aa['origin'], aa['method'],
-                                                              directedness, weighted,
-                                                              percentile_value)
-        cname_full = '{0}_comm_{1}_{2}_{3}_p{4}'.format(aa['origin'], mname, directedness,
-                                                        weighted, percentile_value)
+        fout_name = '{0}_comm_{1}_{2}_{3}_p{4}.{5}'.format(aa['origin'], aa['method'],
+                                                           directedness, weighted,
+                                                           percentile_value, storage_type)
+        cname_full = '{0}_comm_{1}_{2}_{3}_p{4}{5}'.format(aa['origin'], mname, directedness,
+                                                           weighted, percentile_value, suffix)
 
         fnames.append(fout_name)
         cnames.append(cname_full)
