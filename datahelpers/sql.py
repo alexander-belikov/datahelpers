@@ -33,7 +33,7 @@ def get_session_info(session_name):
     return data
 
 
-def get_info(session=None, hostname=None, username=None, password=None):
+def get_info(session=None, hostname=None, username=None, password=None, port=None):
     """
 
     :param session: the session suffix identifying the file ~/.mysql/
@@ -51,6 +51,9 @@ def get_info(session=None, hostname=None, username=None, password=None):
         session_dict['user'] = username
     if password:
         session_dict['passwd'] = password
+    if port:
+        session_dict['port'] = port
+
     conn = connect(**session_dict)
     cur = conn.cursor()
     cur.execute(q1)
@@ -63,7 +66,7 @@ def get_info(session=None, hostname=None, username=None, password=None):
 
 
 def get_table(session=None, hostname=None, username=None,
-              password=None, database='valentin', table='GeneWAys',
+              password=None, port=None, database='valentin', table='GeneWAys',
               query_dict=None):
     """
     Parameters
@@ -94,6 +97,9 @@ def get_table(session=None, hostname=None, username=None,
         session_dict['user'] = username
     if password:
         session_dict['passwd'] = password
+    if port:
+        session_dict['port'] = port
+
     session_dict['db'] = database
 
     if query_dict and 'columns' in query_dict.keys():
