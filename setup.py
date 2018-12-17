@@ -32,6 +32,7 @@ setup(
     install_requires=[
         'numpy',
         'pymysql', 'pandas',
+        'igraph',
         'setuptools', 'PyWavelets',
         'matplotlib', 'seaborn',
         'pathos'],

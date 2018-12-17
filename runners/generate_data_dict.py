@@ -104,7 +104,7 @@ def main(df_type, version, feature_groups,
         columns_dict['normeddensity'] = normed_density_columns + ['norm', 'diffuse']
         df = df2
 
-    # time clustering
+    # time clustering, naive clusters in 1D // not actual
     if 'cycle' in feature_groups:
         print('starting optimal clustering:')
         # naive split
@@ -195,6 +195,7 @@ def main(df_type, version, feature_groups,
         fname = expanduser('~/data/kl/batches/df_{0}_v_{1}_hash_{2}.h5'.format(df_type, version, datatype_hash_trunc))
         store = pd.HDFStore(fname)
         store.put('df', df)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

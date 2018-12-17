@@ -5,7 +5,7 @@ from .constants import ye
 from bm_support.math_aux import find_intlike_delta
 from matplotlib.pyplot import subplots
 from seaborn import set_style
-from seaborn import plt as sns_plt
+# from seaborn import plt as sns_plt
 from os import mkdir
 from os.path import exists
 from functools import partial
@@ -219,7 +219,7 @@ def plot_beta_steps(n_features_ext, dict_base, raw_best_dict_plot_beta, tlow, th
 
         lss = ['-', '--']
         for ys, ls in zip(yss, lss):
-            sns_plt.plot(xs, ys, ls)
+            plt.plot(xs, ys, ls)
 
         if fname_prefix:
             if not exists(path):
@@ -261,10 +261,10 @@ def plot_beta_steps(n_features_ext, dict_base, raw_best_dict_plot_beta, tlow, th
 
         means = mean(array(llist), axis=0)
         ys = map(partial(np_logistic_step, *means), xs)
-        sns_plt.plot(xs, ys, ls='-', lw=2)
+        plt.plot(xs, ys, ls='-', lw=2)
 
         for ys in yss:
-            sns_plt.plot(xs, ys, ls='--', lw=0.5)
+            plt.plot(xs, ys, ls='--', lw=0.5)
 
         if fname_prefix:
             if not exists(path):
@@ -273,3 +273,48 @@ def plot_beta_steps(n_features_ext, dict_base, raw_best_dict_plot_beta, tlow, th
                 path += '/'
             plt.savefig("%s%s_%s%s.%s" % (path, fname_prefix, 'fits_stats_feature_', str(j), format))
 
+
+def matrix_hist(df, ccs, nrows=2, title=None, xmax=None):
+    sns.set_style('whitegrid')
+    ccs_matrix = [ccs[nrows*k:nrows*(k+1)] for k in range(int(np.ceil(len(ccs)/nrows)))]
+    n_columns = len(ccs_matrix)
+
+    fig, axx = plt.subplots(n_columns, nrows, sharey=False,
+                            figsize=(3*nrows, 3*n_columns))
+
+    bins_min_dict = {}
+    hist_plt = True
+    kde_plt = False
+    # hist_plt = False
+    # kde_plt = True
+
+    bins_max_dict = {}
+    if xmax:
+        for c in ccs:
+            bins_max_dict[c] = xmax
+    # if hist_plt and kde_plt:
+    #     how_flag = 'hist_kde'
+    # elif hist_plt and not kde_plt:
+    #     how_flag = 'hist'
+    # elif not hist_plt and kde_plt:
+    #     how_flag = 'kde'
+    kde_kws = {'gridsize': 150}
+    plt.title(title)
+    if not any(isinstance(ax, list) for ax in axx):
+        axx = [axx]
+    for ax_row, c_row in zip(axx, ccs_matrix):
+        # print(len(ax_row), len(c_row))
+        for ax_, c in zip(ax_row, c_row):
+            if c in bins_min_dict.keys():
+                cmin = bins_min_dict[c]
+            else:
+                cmin = 0.0
+            if c in bins_max_dict.keys():
+                cmax = bins_max_dict[c]
+            else:
+                cmax = max([max(df[c]), max(df[c])])
+            delta = 0.1*(cmax - cmin)
+            cbins = np.arange(cmin, cmax+1e-6, delta)
+            # ax_.set_title()
+            sns.distplot(df[c], hist=hist_plt, kde=kde_plt, bins=cbins, ax=ax_, norm_hist=True,
+                         kde_kws=kde_kws, color='blue')
