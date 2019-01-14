@@ -484,3 +484,10 @@ def add_column_from_file(df, fpath, merge_column, merged_column, impute_mean=Tru
         mean = df2[merged_column].mean()
         df_out.loc[mask, merged_column] = mean
     return df_out
+
+
+def keep_longer_histories(df, thr, agg_columns):
+    mask_len_ = (df.groupby(agg_columns).apply(lambda x: x.shape[0]) > thr)
+    updns = mask_len_[mask_len_].reset_index()[agg_columns]
+    dft = df.merge(updns, how='right', on=agg_columns)
+    return dft

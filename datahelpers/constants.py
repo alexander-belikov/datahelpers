@@ -26,3 +26,4 @@ aus = 'authors'
 affs = 'affs'
 dist = gu
 rdist = 'rdist'
+bdist = 'bdist'
