@@ -257,10 +257,10 @@ def prepare_graph_from_df(df, file_format='matrix',
         thr = percentile(df2, percentile_value)
         df2 = df2[df2 > thr]
 
-    es, ws = df2.index.tolist(), df2.values
-    g = ig.Graph(es, directed=directed)
+    edges, weights = df2.index.tolist(), df2.values
+    g = ig.Graph(edges, directed=directed)
 
-    return g, ws, inv_conversion_map
+    return g, weights, inv_conversion_map
 
 
 def prepare_graphdf(full_fname, file_format='matrix', key_hdf_store=False, verbose=False):
@@ -269,7 +269,7 @@ def prepare_graphdf(full_fname, file_format='matrix', key_hdf_store=False, verbo
     elif file_format == 'edges':
         if isinstance(full_fname, str) and not isinstance(full_fname, list):
             if key_hdf_store:
-                store = HDFStore(expanduser(full_fname))
+                store = HDFStore(expanduser(full_fname), mode='r')
                 keys = store.keys()
                 str_key = [k for k in keys if str(key_hdf_store) in k][0]
                 df = read_hdf(expanduser(full_fname), key=str_key)
@@ -279,11 +279,11 @@ def prepare_graphdf(full_fname, file_format='matrix', key_hdf_store=False, verbo
             df = []
             for f in full_fname:
                 if key_hdf_store:
-                    store = HDFStore(expanduser(f))
+                    store = HDFStore(expanduser(f), mode='r')
                     keys = store.keys()
                     str_keys = [k for k in keys if str(key_hdf_store) in k]
                     if str_keys:
-                        df_ = read_hdf(expanduser(f), key=str_keys[0])
+                        df_ = read_hdf(expanduser(f), key=str_keys[0], mode='r')
                     else:
                         df_ = DataFrame()
                     store.close()
@@ -386,7 +386,7 @@ def meta_calculate_comms(full_fname, fpath_out, file_format='matrix', method='mu
         # and loop over them
         set_keys = set()
         for f in full_fname:
-            store = HDFStore(expanduser(f))
+            store = HDFStore(expanduser(f), mode='r')
             set_keys |= set(store.keys())
             store.close()
         keys = sorted(list(set_keys))
