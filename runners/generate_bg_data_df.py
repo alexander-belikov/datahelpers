@@ -5,6 +5,8 @@ import datahelpers.collapse as dc
 import datahelpers.dftools as dfto
 import datahelpers.sql as ds
 from wos_parser.parse import issn2int
+from datahelpers.constants import pm, ye, ai, ps, up, dn, ar, ni, at, ar
+
 import wos_agg.aux as waa
 import numpy as np
 import pickle
@@ -22,16 +24,7 @@ at_str = 'Experimental System'
 at_str_2 = 'Experimental System Type'
 pmid_alias = 'Pubmed ID'
 source = 'Source Database'
-up = 'up'
-dn = 'dn'
-ps = 'pos'
-at = 'action'
-at = 'pos'
-ni = 'new_index'
-pm = 'pmid'
-ye = 'year'
-ai = 'ai'
-ar = 'ar'
+
 
 df = pd.read_csv('/Users/belikov/data/biogrid/BIOGRID-ALL-3.4.152.tab2.zip', header=0,
                  sep='\t', compression='zip', low_memory=False)

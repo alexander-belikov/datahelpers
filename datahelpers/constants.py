@@ -27,3 +27,5 @@ affs = 'affs'
 dist = gu
 rdist = 'rdist'
 bdist = 'bdist'
+at = 'action'
+

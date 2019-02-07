@@ -5,20 +5,10 @@ from os.path import expanduser
 import numpy as np
 from wos_parser.parse import issn2int
 from datahelpers.aux import unfold_df, find_closest_year
+from datahelpers.constants import pm, ye, ai, ps, up, dn, ar, ni, at, ar
+
 import pickle
 import gzip
-
-up = 'up'
-dn = 'dn'
-ps = 'pos'
-at = 'action'
-at = 'pos'
-ni = 'new_index'
-pm = 'pmid'
-ye = 'year'
-ai = 'ai'
-pm = 'pmid'
-ar = 'ar'
 
 version = 8
 

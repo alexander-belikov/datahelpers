@@ -63,6 +63,7 @@ def prepare_ratings(fname, n_rating=5):
     dfr3 = dfr3.rename(columns={'index': rank_id})
     return dfr3[[rank_id, aff, rating]]
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
