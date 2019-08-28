@@ -38,6 +38,8 @@ df[up] = df['Cause'].apply(lambda x: x.split(':')[-1])
 df[dn] = df['Theme'].apply(lambda x: x.split(':')[-1])
 df[upstr] = df[up]
 df[dnstr] = df[dn]
+df[up] = df[up].apply(lambda x: x.lower())
+df[dn] = df[up].apply(lambda x: x.lower())
 
 # define action type
 m = (df[rtype] == 'Positive_regulation')
@@ -83,18 +85,22 @@ dfi2__ = dfi2__.drop_duplicates([up, dn, pm])
 print('*** number of unique pm, up, dn pairs after remerge: ', dfi2__.shape)
 
 # lookup pmids from medline and merge years
-with gzip.open(expanduser('~/data/kl/raw/medline_doc_cs_4.pgz'), 'rb') as fp:
-    df_pmid = pickle.load(fp)
+# with gzip.open(expanduser('~/data/kl/raw/medline_doc_cs_4.pgz'), 'rb') as fp:
+#     df_pmid = pickle.load(fp)
+
+df_pmid = pd.read_csv(expanduser('~/data/kl/raw/medline_doc_cs_4.csv.gz'), index_col=0)
 
 mask_issn = df_pmid['issn'].notnull()
 df_pmid['issn_str'] = df_pmid['issn']
 df_pmid.loc[mask_issn, 'issn'] = df_pmid.loc[mask_issn, 'issn'].apply(issn2int)
 
-# drop pmids without years
-df_pmid = df_pmid.loc[~df_pmid['year'].isnull()]
+# drop pmids without years and issn
+df_pmid = df_pmid.loc[~df_pmid['year'].isnull() & ~df_pmid['issn'].isnull()]
 
 # convert years to int
 df_pmid['year'] = df_pmid['year'].astype(int)
+# convert issn to int
+df_pmid['issn'] = df_pmid['issn'].astype(int)
 
 # merge literome pmids to
 pmids2 = pd.merge(pd.DataFrame(pmids, columns=[pm]), df_pmid, how='inner', on=pm)
@@ -161,7 +167,7 @@ print('{0} ai value imputed. frac {0:.3f}'.format(sum(mask), mask.shape[0], sum(
 print('*** number of unique pm, up, dn after attaching ai: {0}'.format(dfi4.shape[0]))
 
 # affiliations
-df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
+df_affs = pd.read_csv(expanduser('~/data/kotta/affiliations/aff_rating.csv.gz'),
                       compression='gzip').rename(columns={'rating': ar})
 
 dfi5 = pd.merge(dfi4, df_affs, how='left', on=pm)
