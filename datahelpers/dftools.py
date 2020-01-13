@@ -157,7 +157,7 @@ def attach_new_index(dfw, redux_dict, map_name, index_cols, new_index_name):
     return df_conv_new_index
 
 
-def collapse_column(dfw, redux_dict, map_name):
+def collapse_column(dfw, redux_dict, map_name, verbose=False):
     """
 
     :param dfw: DataFrame to work on
@@ -168,6 +168,9 @@ def collapse_column(dfw, redux_dict, map_name):
     col_orig, col_reduced = map_name
     # 1) cut the part of dfw, whose domain is the domain of redux_dict map
     mask = dfw[col_orig].isin(redux_dict.keys())
+
+    if verbose:
+        print(f'keep {sum(mask)} of {dfw.shape[0]}')
 
     # 2) create col_reduced in df_conv
     df_conv = dfw.loc[mask].copy()

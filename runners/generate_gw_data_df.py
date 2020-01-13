@@ -1,14 +1,40 @@
-import numpy as np
+from os.path import expanduser
 import pandas as pd
-import datahelpers.collapse as dc
-import datahelpers.dftools as dfto
-from wos_parser.parse import issn2int
 import pickle
 import gzip
 import json
-from os.path import expanduser
-from datahelpers.aux import find_closest_year
+import datahelpers.collapse as dc
 from datahelpers.constants import pm, ye, ai, ps, ar, ni, up, dn
+from datahelpers.dftools import collapse_df, collapse_column
+
+import numpy as np
+import datahelpers.dftools as dfto
+from wos_parser.parse import issn2int
+from datahelpers.aux import find_closest_year
+import seaborn as sns
+
+hi = 'hiid'
+ng = 'negative'
+at_orig = 'actiontype'
+ft = 'isFullText'
+at = 'act'
+sc = 'score'
+prec = 'prec'
+upstr = 'upstream'
+dnstr = 'downstream'
+from_abstract = 'from_abstract'
+sn_bint = 'bin_int'
+
+
+def print_stats(df):
+    a = df.drop_duplicates([up, dn]).shape[0]
+    b = df.drop_duplicates([up, dn, pm]).shape[0]
+    c = df.drop_duplicates([pm]).shape[0]
+    d = df.shape[0]
+    print(f'unique up->dn pairs {a};\n'
+          f'unique (up, dn, pm) {b};\n'
+          f'unique pm {c};\n'
+          f'unique rows {d}')
 
 
 def xor(df, ccs, c):
@@ -24,46 +50,43 @@ def xor(df, ccs, c):
     print('number of negative claims on reduced statements {0}'.format(df2.shape[0] - sum(df2[c])))
     return df2
 
-# TODO revamp min year for ef_ai
-# TODO attach ai ~ separate func
 
 origin = 'gw'
-# version = 8
-# version = 9
-# version with affiliation ranking
-version = 10
-version = 11
-
-full_statement_flag = True
-
-hi = 'hiid'
-ng = 'negative'
-at_orig = 'actiontype'
-ft = 'isFullText'
-at = 'act'
-upstr = 'upstream'
-dnstr = 'downstream'
-
-with gzip.open(expanduser('~/data/kl/raw/val_geneways_cs_0.pgz'), 'rb') as fp:
-    dfi = pickle.load(fp)
-
-# leave only claims from abstracts
-dfi2 = dfi.loc[dfi[ft] == 'N', [hi, ng, pm, at_orig, upstr, dnstr]]
-
-version2actions = {8: '', 9: '_v2', 10: '', 11: ''}
+version = 12
 
 
-dfdd = {}
-dfi2, dfdd = dc.collapse_df(dfi2, str_dicts=dfdd, dropna_columns=[pm, hi],
-                            bool_columns=[ng],
-                            numeric_columns=[pm, hi])
+dfi = pd.read_pickle('~/data/kl/raw/val_geneways_cs_0.pgz',
+                     compression='gzip')
 
-# merge (id-pm-claims-issn-ye-ai) onto (id-up-dn)
 df_ha = pd.read_csv('~/data/kl/raw/human_action.txt.gz',
                     sep='\t', index_col=None, compression='gzip')
 
-# version 8 uses actions.json
-# version 9 usues actions_v2.json
+df_pmid = pd.read_pickle('~/data/kl/raw/medline_doc_cs_2.pgz',
+                         compression='gzip')
+
+df_affs = pd.read_csv('~/data/kotta/affiliations/aff_rating.csv.gz',
+                      compression='gzip').rename(columns={'rating': ar})
+
+# retrieve issn-ye-ef-ai table (issn-ye-ai)
+df_ai = pd.read_csv(expanduser('~/data/kl/eigen/ef_ai_1990_2014.csv.gz'),
+                    index_col=0, compression='gzip')
+
+
+dfi.replace({sc: 'NULL', prec: 'NULL', pm: 'NULL'}, np.nan, inplace=True)
+dfi[hi] = dfi[hi].astype(int)
+
+dfi[sc]  = dfi[sc].astype(float)
+dfi[prec]  = dfi[prec].astype(float)
+dfi = dfi.loc[dfi[pm].notnull()]
+dfi[pm] = dfi[pm].astype(int)
+
+df_ha[hi] = df_ha[hi].astype(int)
+dfi[ng] = (dfi[ng] == '1')
+
+dfi[from_abstract] = (dfi[ft] == 'N')
+
+version2actions = {8: '', 9: '_v2', 10: '', 11: '', 12: ''}
+
 with open(expanduser('~/data/kl/claims/actions{0}.json'.format(version2actions[version])), 'r') as fp:
     agg_act_dict = json.load(fp)
 
@@ -73,21 +96,65 @@ agg_act_dict = {bools[k]: v for k, v in agg_act_dict.items()}
 
 invdd = dc.invert_dict_of_list(agg_act_dict)
 
-df_ni = dfto.attach_new_index(df_ha, invdd, [at_orig, at], [up, dn], ni)
+df_ha[at] = df_ha[at_orig].apply(lambda x: invdd[x] if x in invdd.keys() else np.nan)
 
-dfi2 = dfi2.merge(df_ni[[hi, ni, up, dn, at]], on=hi)
 
-dfi2 = xor(dfi2, [at, ng], ps)
+dfi_important_columns = [hi, pm, sc, prec, ng, from_abstract]
 
-unambiguous_extraction = dfi2.groupby([ni, pm]).apply(lambda x: len(x[ps].unique())).reset_index()
-good_claims = unambiguous_extraction.loc[unambiguous_extraction[0] == 1, [ni, pm]]
-dfi2 = dfi2.merge(good_claims, on=[ni, pm], how='right').drop_duplicates([ni, pm])
+ha_important_columns = [hi, up, dn, at_orig, 'plo', at]
 
-pd.DataFrame(dfi2[pm].unique(), columns=[pm]).to_csv(expanduser('~/data/gw/gw_pmids.csv.gz'),
-                                                     sep=',', compression='gzip')
+dfr = pd.merge(dfi[dfi_important_columns],
+               df_ha[ha_important_columns], on=hi)
 
-with gzip.open(expanduser('~/data/kl/raw/medline_doc_cs_2.pgz'), 'rb') as fp:
-    df_pmid = pickle.load(fp)
+mask_pos = (dfr[at].notnull()) & (dfr[at] & (dfr[ng] == False))
+mask_npos = (dfr[at].notnull()) & (dfr[at] & dfr[ng])
+
+mask_neg = (dfr[at].notnull()) & ((dfr[at] == False) & (dfr[ng] == False))
+mask_nneg = (dfr[at].notnull()) & ((dfr[at] == False) & dfr[ng])
+
+dfr[sn_bint] = np.nan
+dfr.loc[mask_pos, sn_bint] = 1.0
+dfr.loc[mask_npos, sn_bint] = 0.25
+dfr.loc[mask_neg, sn_bint] = 0.0
+dfr.loc[mask_nneg, sn_bint] = 0.75
+
+columns_final = [hi, up, dn, pm, sn_bint, at_orig, at, ng, from_abstract, prec, sc, 'plo']
+dfr = dfr[columns_final]
+
+with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}_full.pgz'.format(origin, version)), 'wb') as fp:
+    pickle.dump(dfr, fp)
+
+# only pos/neg
+dfa = dfr[dfr[at].notnull()]
+print_stats(dfa)
+
+# only pos/neg from abstract
+dfb = dfa[dfa[from_abstract]].copy()
+print_stats(dfb)
+
+# only pos/neg from abstract with known precision
+dfc = dfb[dfb[sc].notnull()].copy()
+print_stats(dfc)
+
+dfc[sc + '_shifted'] = dfc[sc] - dfc[sc].min() + 0.01
+
+df_bint_est = dfc.groupby([up, dn, pm],
+                          group_keys=False).apply(lambda g:
+                                                  np.sum(g[sn_bint]*g[sc + '_shifted'])/g[sc + '_shifted'].sum())
+df_bint_est = df_bint_est.reset_index().rename(columns={0: 'bint_est'})
+
+df_score_est = dfc.groupby([up, dn, pm],
+                           group_keys=False).apply(lambda g: g[sc].sum())
+df_score_est = df_score_est.reset_index().rename(columns={0: 'score_est'})
+
+dfw = df_bint_est.merge(df_score_est, on=[up, dn, pm])
+
+dfw = dfw.merge(dfc[[up, dn, pm, at_orig, from_abstract, 'plo']],
+                on=[up, dn, pm], how='left')
+
+# claims pos/neg, from abstracts, with known precision / without features glued
+with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}_cut_raw.pgz'.format(origin, version)), 'wb') as fp:
+    pickle.dump(dfr, fp)
 
 df_pmid = df_pmid[~df_pmid['issn'].isnull()]
 
@@ -101,25 +168,21 @@ df_pmid = df_pmid.loc[~df_pmid['year'].isnull()]
 df_pmid['year'] = df_pmid['year'].astype(int)
 set_pmids_issns = set(df_pmid['issn'].unique())
 
-# retrieve issn-ye-ef-ai table (issn-ye-ai)
-df_ai = pd.read_csv(expanduser('~/data/kl/eigen/ef_ai_1990_2014.csv.gz'), index_col=0, compression='gzip')
-
 set_ai_issns = set(df_ai['issn'].unique())
 print('{0} issns in pmids-issn table that are not ai table'.format(len(set_pmids_issns - set_ai_issns)))
 print('{0} issns in pmids-issn table that are ai table'.format(len(set_pmids_issns & set_ai_issns)))
-working_pmids = set(dfi2['pmid'].unique())
+working_pmids = set(dfr['pmid'].unique())
 issn_pmids = set(df_pmid['pmid'].unique())
 print('{0} of pmids from geneways that are not in pmid-issn table'.format(len(working_pmids - issn_pmids)))
 mask = df_pmid['issn'].isin(list(set_ai_issns))
 print('{0} of pmids in pmid-issn table that are in issn-ai table'.format(sum(mask)))
 
-
 # cut (pm-issn) to issns only in (issn-ye-aiai)
 df_pmid2 = df_pmid.loc[mask]
-dfi3 = pd.merge(dfi2, df_pmid2, on='pmid')
-# merge (pm-issn) onto (claims)
+dfw2 = pd.merge(dfw, df_pmid2, on=pm)
+# merge (pm-issn) aonto (claims)
 
-fraction = float(dfi3.shape[0])/dfi2.shape[0]
+fraction = float(dfw2.shape[0]) / dfr.shape[0]
 print('fraction of claims with issn {0:.4f}'.format(fraction))
 
 df_pmid_reduced = df_pmid2[['issn', 'year']].drop_duplicates(['issn', 'year'])
@@ -130,10 +193,10 @@ for it in df_ai[['issn', 'year']].iterrows():
         dd_ai[it[1]['issn']].append(it[1]['year'])
     else:
         dd_ai[it[1]['issn']] = [it[1]['year']]
-        
+
 list_proxy_year = []
 for it in df_pmid_reduced.iterrows():
-    ind, val = it    
+    ind, val = it
     proxy = find_closest_year(val['year'], dd_ai[val['issn']])
     list_proxy_year.append((val['issn'], val['year'], proxy))
 df_proxy_years = pd.DataFrame(np.array(list_proxy_year), columns=['issn', 'year', 'proxy_year'])
@@ -143,20 +206,14 @@ df_pmid3 = pd.merge(df_pmid2, df_proxy_years, on=['issn', 'year'])
 df_ai = df_ai.rename(columns={'year': 'ai_year'})
 df_feature = pd.merge(df_pmid3, df_ai, left_on=['issn', 'proxy_year'], right_on=['issn', 'ai_year'])
 df_feature_cut = df_feature[['pmid', 'ai_cdf']].rename(columns={'ai_cdf': ai})
-dfi4 = pd.merge(dfi3, df_feature_cut, on=pm)
-
-df_affs = pd.read_csv(expanduser('~/data/tmp/aff_rating.csv.gz'),
-                      compression='gzip').rename(columns={'rating': ar})
+dfw3 = pd.merge(dfw2, df_feature_cut, on=pm)
 
 df_affs = df_affs.drop_duplicates(pm)
 
-dfi4 = pd.merge(dfi4, df_affs, how='left', on=pm)
+dfw3 = pd.merge(dfw3, df_affs, how='left', on=pm)
 
-dfi4[ar] = dfi4[ar].fillna(-1)
+dfw3[ar] = dfw3[ar].fillna(-1)
 
+# claims pos/neg, from abstracts, with known precision / with features glued
 with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}.pgz'.format(origin, version)), 'wb') as fp:
-    pickle.dump(dfi4[[ni, pm, up, dn, ps, ye, ai, ar]], fp)
-
-if full_statement_flag:
-    with gzip.open(expanduser('~/data/kl/claims/df_{0}_{1}_fs.pgz'.format(origin, version)), 'wb') as fp:
-        pickle.dump(dfi4[[ni, pm, up, dn, ps, ye, ai, ar, upstr, dnstr, at_orig, ng]], fp)
+    pickle.dump(dfw3, fp)
