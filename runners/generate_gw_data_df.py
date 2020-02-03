@@ -52,7 +52,10 @@ def xor(df, ccs, c):
 
 
 origin = 'gw'
+# negation of negative goes to 0.75, negation of positive to 0.25
 version = 12
+# negation of negative goes to 1.0, negation of positive to 0.0
+version = 13
 
 
 dfi = pd.read_pickle('~/data/kl/raw/val_geneways_cs_0.pgz',
@@ -85,7 +88,7 @@ dfi[ng] = (dfi[ng] == '1')
 
 dfi[from_abstract] = (dfi[ft] == 'N')
 
-version2actions = {8: '', 9: '_v2', 10: '', 11: '', 12: ''}
+version2actions = {8: '', 9: '_v2', 10: '', 11: '', 12: '', 13: '' }
 
 with open(expanduser('~/data/kl/claims/actions{0}.json'.format(version2actions[version])), 'r') as fp:
     agg_act_dict = json.load(fp)
@@ -114,9 +117,11 @@ mask_nneg = (dfr[at].notnull()) & ((dfr[at] == False) & dfr[ng])
 
 dfr[sn_bint] = np.nan
 dfr.loc[mask_pos, sn_bint] = 1.0
-dfr.loc[mask_npos, sn_bint] = 0.25
+dfr.loc[mask_npos, sn_bint] = 0.0
+# dfr.loc[mask_npos, sn_bint] = 0.25
 dfr.loc[mask_neg, sn_bint] = 0.0
-dfr.loc[mask_nneg, sn_bint] = 0.75
+# dfr.loc[mask_nneg, sn_bint] = 0.75
+dfr.loc[mask_nneg, sn_bint] = 1.0
 
 columns_final = [hi, up, dn, pm, sn_bint, at_orig, at, ng, from_abstract, prec, sc, 'plo']
 dfr = dfr[columns_final]
