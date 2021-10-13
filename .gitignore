@@ -12,6 +12,7 @@ __pycache__/
 *.cpp
 
 # Distribution / packaging
+.idea
 .Python
 env/
 build/
