@@ -18,15 +18,17 @@ def interpolate_table(input_list, return_size):
     returns:
 
     """
+
     def step_function(x):
         """stepwise function approximation to the input_list on [0, 1]
         """
-        k = int(x*len(input_list))
+        k = int(x * len(input_list))
         return input_list[k]
+
     vfunc = np.vectorize(step_function)
-    x = np.arange(float(return_size))/return_size
+    x = np.arange(float(return_size)) / return_size
     r = vfunc(x)
-    r *= (sum(input_list)/len(input_list))/(sum(r)/return_size)
+    r *= (sum(input_list) / len(input_list)) / (sum(r) / return_size)
     return r
 
 
@@ -43,7 +45,7 @@ def low_freq_wavedec(input_list, order=10, order_low_frequency=4):
 
 
     """
-    input_ = interpolate_table(input_list, 2**order)
-    spec = pw.wavedec(input_, 'haar')[:order_low_frequency+1]
-    conv_const = 2**(0.5*(order_low_frequency-order))
-    return [s*conv_const for s in spec]
+    input_ = interpolate_table(input_list, 2 ** order)
+    spec = pw.wavedec(input_, "haar")[: order_low_frequency + 1]
+    conv_const = 2 ** (0.5 * (order_low_frequency - order))
+    return [s * conv_const for s in spec]

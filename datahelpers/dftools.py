@@ -55,10 +55,10 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     """
 
     df = df_init[columns].copy()
-    c_derived = columns[0] + 'x' + columns[1]
+    c_derived = columns[0] + "x" + columns[1]
     x = columns[0]
     y = columns[1]
-    z = 'z'
+    z = "z"
     pairs = {x: y, y: x}
 
     masks = {}
@@ -77,7 +77,7 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
 
     masks[z] = mask_z
 
-    mask_biject = pd.Series([True]*df.shape[0], df.index)
+    mask_biject = pd.Series([True] * df.shape[0], df.index)
 
     for k in masks.keys():
         mask_biject &= ~masks[k]
@@ -94,21 +94,35 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
         if k in sni_index:
             sni_ids = df.loc[masks[k], pairs[k]].unique()
             number_uniques = len(sni_ids)
-            index_dict = {key: v
-                          for (key, v) in zip(sni_ids,
-                                              np.arange(current_index, current_index + number_uniques))}
-            df.loc[m, c_derived] = df.loc[m, pairs[k]].apply(lambda arg: index_dict[arg])
+            index_dict = {
+                key: v
+                for (key, v) in zip(
+                    sni_ids, np.arange(current_index, current_index + number_uniques)
+                )
+            }
+            df.loc[m, c_derived] = df.loc[m, pairs[k]].apply(
+                lambda arg: index_dict[arg]
+            )
         else:
             number_uniques = np.sum(m)
-            df.loc[m, c_derived] = np.arange(current_index, current_index + number_uniques)
+            df.loc[m, c_derived] = np.arange(
+                current_index, current_index + number_uniques
+            )
 
         current_index += number_uniques
 
     if ambiguous_index and ambiguous_index in columns:
         sni_ids = df.loc[mask_z, ambiguous_index].unique()
         number_uniques = len(sni_ids)
-        index_dict = {key: v for (key, v) in zip(sni_ids, np.arange(current_index, current_index + number_uniques))}
-        df.loc[mask_z, c_derived] = df.loc[mask_z, ambiguous_index].apply(lambda arg: index_dict[arg])
+        index_dict = {
+            key: v
+            for (key, v) in zip(
+                sni_ids, np.arange(current_index, current_index + number_uniques)
+            )
+        }
+        df.loc[mask_z, c_derived] = df.loc[mask_z, ambiguous_index].apply(
+            lambda arg: index_dict[arg]
+        )
 
     else:
         df = df.loc[~mask_z]
@@ -121,7 +135,7 @@ def create_unique_index(df_init, columns, sni_index=[], ambiguous_index=None):
     return dfr
 
 
-def get_multiplet_to_int_index(df, index_cols=triplet_index_cols, int_index_name='it'):
+def get_multiplet_to_int_index(df, index_cols=triplet_index_cols, int_index_name="it"):
     """
 
     :param df:
@@ -133,9 +147,9 @@ def get_multiplet_to_int_index(df, index_cols=triplet_index_cols, int_index_name
     df2 = df[index_cols].drop_duplicates(index_cols)
     # create proxy integer multiplet integer it <-> t
     df3 = df2.set_index(index_cols).reset_index()
-    df4 = df3.reset_index().rename(columns={'index': int_index_name})
+    df4 = df3.reset_index().rename(columns={"index": int_index_name})
     # merge back i_t into df with unique t = (t1, t2, t3) and i_h
-    df5 = pd.merge(df, df4, on=index_cols, how='left')
+    df5 = pd.merge(df, df4, on=index_cols, how="left")
 
     return df5
 
@@ -170,7 +184,7 @@ def collapse_column(dfw, redux_dict, map_name, verbose=False):
     mask = dfw[col_orig].isin(redux_dict.keys())
 
     if verbose:
-        print(f'keep {sum(mask)} of {dfw.shape[0]}')
+        print(f"keep {sum(mask)} of {dfw.shape[0]}")
 
     # 2) create col_reduced in df_conv
     df_conv = dfw.loc[mask].copy()
@@ -178,8 +192,12 @@ def collapse_column(dfw, redux_dict, map_name, verbose=False):
     return df_conv
 
 
-def process_df_index(dft0, index_cols=triplet_index_cols, int_index_name=integer_agg_index,
-                     prefer_triplet=False):
+def process_df_index(
+    dft0,
+    index_cols=triplet_index_cols,
+    int_index_name=integer_agg_index,
+    prefer_triplet=False,
+):
     """
     the default behaviour is to throw away
     :param dft0:
@@ -190,20 +208,22 @@ def process_df_index(dft0, index_cols=triplet_index_cols, int_index_name=integer
     """
 
     # get df with unique t = (t1, t2, t3) and i_h
-    dfw = dft0[index_cols + ['hiid']].drop_duplicates(index_cols + ['hiid'])
+    dfw = dft0[index_cols + ["hiid"]].drop_duplicates(index_cols + ["hiid"])
     dfw5 = get_multiplet_to_int_index(dfw, index_cols)
     # create a unique index across i_t and i_h
     # in case there is an ambiguity - prefer 'hiid'
     if prefer_triplet:
-        ll = ['hiid']
+        ll = ["hiid"]
     else:
         ll = [int_index_name]
-    dfw6 = create_unique_index(dfw5, ['hiid', int_index_name], ll)
-    df2 = pd.merge(dft0, dfw6, on=index_cols + ['hiid'], how='inner')
+    dfw6 = create_unique_index(dfw5, ["hiid", int_index_name], ll)
+    df2 = pd.merge(dft0, dfw6, on=index_cols + ["hiid"], how="inner")
     return df2
 
 
-def regexp_collapse_protein_cols(dft0, collapse_df_flag=True, regexp_columns=protein_cols):
+def regexp_collapse_protein_cols(
+    dft0, collapse_df_flag=True, regexp_columns=protein_cols
+):
     """
 
     :param dft0: initial DataFrame
@@ -232,9 +252,11 @@ def compute_centralities(df, node_cols, edge_type, extra_attr):
     :param extra_attr:
     :return:
     """
-    dict_keys = {'uni_nodes': node_cols,
-                 'uni_nodes_edge': node_cols+edge_type,
-                 'uni_nodes_edge_extra': node_cols+edge_type+extra_attr}
+    dict_keys = {
+        "uni_nodes": node_cols,
+        "uni_nodes_edge": node_cols + edge_type,
+        "uni_nodes_edge_extra": node_cols + edge_type + extra_attr,
+    }
 
     # uni_nodes - number of connections a -> b for a give 'a' over diff 'b'
     # uni_nodes_edge - number of connection a->c->b, where c is the type of edge
@@ -249,27 +271,32 @@ def compute_centralities(df, node_cols, edge_type, extra_attr):
     for d in node_cols:
         for k in dict_dfs.keys():
             dft = dict_dfs[k].groupby(d).apply(lambda x: x.shape[0]).sort_values()
-            dft = dft.rename('centr_' + d + '_' + k)
-            df = pd.merge(df, pd.DataFrame(dft), how='left', left_on=d, right_index=True)
+            dft = dft.rename("centr_" + d + "_" + k)
+            df = pd.merge(
+                df, pd.DataFrame(dft), how="left", left_on=d, right_index=True
+            )
     return df
 
 
 def extract_idc_within_frequency_interval(df, id_col, flag_col, freq_int, min_length=0):
     val_low, val_hi = freq_int
-    ps_frac = df.groupby(id_col).apply(lambda x: float(sum(x[flag_col]))/x.shape[0])
+    ps_frac = df.groupby(id_col).apply(lambda x: float(sum(x[flag_col])) / x.shape[0])
 
     # check - most popular claims
     vc_idt = df[id_col].value_counts()
 
-    vc_idt.name = 'n_claims'
-    ps_frac.name = 'ps_frac'
-    df_info = pd.merge(pd.DataFrame(vc_idt), pd.DataFrame(ps_frac),
-                       left_index=True, right_index=True).sort_values('n_claims', ascending=False)
+    vc_idt.name = "n_claims"
+    ps_frac.name = "ps_frac"
+    df_info = pd.merge(
+        pd.DataFrame(vc_idt), pd.DataFrame(ps_frac), left_index=True, right_index=True
+    ).sort_values("n_claims", ascending=False)
 
-    m_frac = (df_info['ps_frac'] >= val_low) & \
-             (df_info['ps_frac'] <= val_hi) & \
-             (df_info['n_claims'] >= min_length)
-    dfr = df_info.loc[m_frac].sort_values('n_claims', ascending=False)
+    m_frac = (
+        (df_info["ps_frac"] >= val_low)
+        & (df_info["ps_frac"] <= val_hi)
+        & (df_info["n_claims"] >= min_length)
+    )
+    dfr = df_info.loc[m_frac].sort_values("n_claims", ascending=False)
     ids = list(dfr.index)
     return ids
 
@@ -298,16 +325,16 @@ def dict_to_array(ddict):
     keys = list(ddict.keys())
     arrays_list = [ddict[k] for k in keys]
     arr = np.concatenate(arrays_list, axis=1)
-    keys_list = [[int(k)]*ddict[k].shape[1] for k in keys]
+    keys_list = [[int(k)] * ddict[k].shape[1] for k in keys]
     keys_arr = np.concatenate(keys_list)
     final_array = np.concatenate([keys_arr.reshape(-1, keys_arr.shape[0]), arr])
     return final_array
 
 
 def select_appropriate_datapoints(df, masks):
-    m0 = pd.Series([True]*df.shape[0], df.index)
+    m0 = pd.Series([True] * df.shape[0], df.index)
     for c, thr, foo in masks:
-        m = (foo(df[c], thr))
+        m = foo(df[c], thr)
         m0 &= m
     return df.loc[m0].copy()
 
@@ -316,9 +343,11 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
     # drop rows with col == 'NULL'
     # drop (ni, pm) duplicates
     # only max value of col remain from duplicates
-    maskt = (dft[col] == 'NULL')
-    print('fraction of claims with missing '
-          'precision dropped: {0:.4f}'.format(float(sum(maskt)) / maskt.shape[0]))
+    maskt = dft[col] == "NULL"
+    print(
+        "fraction of claims with missing "
+        "precision dropped: {0:.4f}".format(float(sum(maskt)) / maskt.shape[0])
+    )
     dft2 = dft.loc[~maskt].copy()
     dft2[col] = dft2[col].astype(float)
     dft2 = dft2.reset_index(drop=True)
@@ -333,9 +362,14 @@ def count_elements_smaller_than_self(x, window=None, right_continuous=False):
     uniques, counts = unique(x, return_counts=True)
     if window and window >= 0:
         if right_continuous:
-            csum = [np.sum(counts[(v - window <= uniques) & (uniques <= v)]) for v in uniques]
+            csum = [
+                np.sum(counts[(v - window <= uniques) & (uniques <= v)])
+                for v in uniques
+            ]
         else:
-            csum = [np.sum(counts[(v - window <= uniques) & (uniques < v)]) for v in uniques]
+            csum = [
+                np.sum(counts[(v - window <= uniques) & (uniques < v)]) for v in uniques
+            ]
 
     else:
         csum = cumsum(counts)
@@ -350,16 +384,19 @@ def count_elements_smaller_than_self_wdensity(x, window=None, right_continuous=F
     if window and window > 0:
         denom = full(x.values.shape, float(window))
     else:
-        denom = (x.values - np.min(x))
+        denom = x.values - np.min(x)
     dns = np.true_divide(cnts, denom, where=(denom != 0))
     if right_continuous:
-        rc = 'rc'
+        rc = "rc"
     else:
-        rc = ''
+        rc = ""
     if window:
-        cpop_, cden_ = '{0}{1}{2}'.format(cpop, rc, window), '{0}{1}{2}'.format(cden, rc, window)
+        cpop_, cden_ = (
+            "{0}{1}{2}".format(cpop, rc, window),
+            "{0}{1}{2}".format(cden, rc, window),
+        )
     else:
-        cpop_, cden_ = '{0}{1}'.format(cpop, rc), '{0}{1}'.format(cden, rc)
+        cpop_, cden_ = "{0}{1}".format(cpop, rc), "{0}{1}".format(cden, rc)
     dfr = pd.DataFrame(vstack([cnts, dns]).T, index=x.index, columns=[cpop_, cden_])
     return dfr
 
@@ -380,14 +417,14 @@ def calculate_uniformity_ks(cdata, window=None, right_continuous=False):
     agg_ks = []
     for y in cyears:
         if y == min_ye:
-            test_stat = 0., 1.
+            test_stat = 0.0, 1.0
         else:
             if window and window >= 0:
                 lbound = max([min_ye, y - window])
                 if right_continuous:
-                    data = cdata[(cdata <= y) & (cdata > y-window)].values
+                    data = cdata[(cdata <= y) & (cdata > y - window)].values
                 else:
-                    data = cdata[(cdata < y) & (cdata > y-window)].values
+                    data = cdata[(cdata < y) & (cdata > y - window)].values
             else:
                 lbound = min_ye
                 if right_continuous:
@@ -395,25 +432,25 @@ def calculate_uniformity_ks(cdata, window=None, right_continuous=False):
                 else:
                     data = cdata[cdata < y].values
             if data.shape[0] > 0:
-                test_stat = kstest(data, uniform(loc=lbound, scale=y-lbound).cdf)
+                test_stat = kstest(data, uniform(loc=lbound, scale=y - lbound).cdf)
             else:
-                test_stat = 0., 1.
+                test_stat = 0.0, 1.0
         agg_ks.append(test_stat[0])
     vals = concatenate([repeat(i, c) for i, c in zip(agg_ks, counts)])
     vals = vals[ii2]
 
-    #NB for discreet data, e.g. years. ks p value goes down with the size of the sample
+    # NB for discreet data, e.g. years. ks p value goes down with the size of the sample
     # it does not like the discreet nature
     # ksst -> 0 very uniform k-> infy
 
     if right_continuous:
-        rc = 'rc'
+        rc = "rc"
     else:
-        rc = ''
+        rc = ""
     if window:
-        cname = '{0}{1}{2}'.format('ksst', rc, window)
+        cname = "{0}{1}{2}".format("ksst", rc, window)
     else:
-        cname = '{0}{1}'.format('ksst', rc)
+        cname = "{0}{1}".format("ksst", rc)
     dfr = pd.DataFrame(vals, index=cdata.index, columns=[cname])
 
     # dfks = pd.DataFrame(agg_ks, columns=[ye, cname])
@@ -436,7 +473,7 @@ def parse_wos_simple_format(ll, keys):
     info_dict = {}
     # simplified version that works for one line info extraction
     for item in ll:
-        morphems = item.split(' ')
+        morphems = item.split(" ")
         prefix = morphems[0]
         for k in keys:
             if prefix == k:
@@ -449,21 +486,24 @@ def parse_wos_simple_format(ll, keys):
 
 
 def parse_wos_record(record, keys):
-    items = [(len(x.split(' ')[0]) == 2 and x[0] != ' ') for x in record]
-    indices = [(i, record[i].split(' ')[0]) for i, x in enumerate(items) if x]
+    items = [(len(x.split(" ")[0]) == 2 and x[0] != " ") for x in record]
+    indices = [(i, record[i].split(" ")[0]) for i, x in enumerate(items) if x]
     indices_dict = {a[1]: (a[0], b[0]) for a, b in zip(indices[:-1], indices[1:])}
     indices_dict.update({indices[-1][1]: (indices[-1][0], len(record))})
     rrecord = []
     for k in keys:
         if k in indices_dict.keys():
             a, b = indices_dict[k]
-            if b-a == 1:
-                rrecord.append(record[a][len(k):].lstrip())
+            if b - a == 1:
+                rrecord.append(record[a][len(k) :].lstrip())
             else:
-                r = '|'.join([record[a][len(k):].lstrip()] + [x.lstrip() for x in record[a+1:b]])
+                r = "|".join(
+                    [record[a][len(k) :].lstrip()]
+                    + [x.lstrip() for x in record[a + 1 : b]]
+                )
                 rrecord.append(r)
         else:
-            rrecord.append('')
+            rrecord.append("")
     return rrecord
 
 
@@ -471,16 +511,16 @@ def agg_file_info(fname, keys):
     # parsing web of science plain text dumps
     # webofknowledge.com
     lines = open(fname).read().splitlines()
-    lines2 = list(group(lines, ''))
+    lines2 = list(group(lines, ""))
     data = [parse_wos_record(x, keys) for x in lines2]
     data2 = list(filter(lambda x: x[0], data))
     return data2
 
 
 def add_column_from_file(df, fpath, merge_column, merged_column, impute_mean=True):
-    df_cite = pd.read_csv(fpath, compression='gzip', index_col=None)
+    df_cite = pd.read_csv(fpath, compression="gzip", index_col=None)
     # print(df_cite.shape)
-    df2 = pd.merge(df, df_cite, on=merge_column, how='left')
+    df2 = pd.merge(df, df_cite, on=merge_column, how="left")
     df_out = df2.copy()
     if impute_mean:
         mask = df2[merged_column].isnull()
@@ -490,7 +530,7 @@ def add_column_from_file(df, fpath, merge_column, merged_column, impute_mean=Tru
 
 
 def keep_longer_histories(df, thr, agg_columns):
-    mask_len_ = (df.groupby(agg_columns).apply(lambda x: x.shape[0]) > thr)
+    mask_len_ = df.groupby(agg_columns).apply(lambda x: x.shape[0]) > thr
     updns = mask_len_[mask_len_].reset_index()[agg_columns]
-    dft = df.merge(updns, how='right', on=agg_columns)
+    dft = df.merge(updns, how="right", on=agg_columns)
     return dft

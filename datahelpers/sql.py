@@ -4,8 +4,8 @@ from json import load
 from os.path import expanduser, join
 
 
-session_dir = '.mysql'
-session_file_prefix = 'session_'
+session_dir = ".mysql"
+session_file_prefix = "session_"
 
 q1 = """
 SELECT
@@ -26,9 +26,8 @@ def get_session_info(session_name):
 
     data = {}
     if session_name:
-        fpath = join(expanduser('~'), session_dir,
-                     session_file_prefix+session_name)
-        with open(fpath, 'r') as f:
+        fpath = join(expanduser("~"), session_dir, session_file_prefix + session_name)
+        with open(fpath, "r") as f:
             data = load(f)
     return data
 
@@ -46,13 +45,13 @@ def get_info(session=None, hostname=None, username=None, password=None, port=Non
     """
     session_dict = get_session_info(session)
     if hostname:
-        session_dict['host'] = hostname
+        session_dict["host"] = hostname
     if username:
-        session_dict['user'] = username
+        session_dict["user"] = username
     if password:
-        session_dict['passwd'] = password
+        session_dict["passwd"] = password
     if port:
-        session_dict['port'] = port
+        session_dict["port"] = port
 
     conn = connect(**session_dict)
     cur = conn.cursor()
@@ -60,14 +59,21 @@ def get_info(session=None, hostname=None, username=None, password=None, port=Non
     ll = []
     for row in cur.fetchall():
         ll.append(row)
-    df = DataFrame(ll, columns=['db', 'table', 'size'])
+    df = DataFrame(ll, columns=["db", "table", "size"])
     conn.close()
     return df
 
 
-def get_table(session=None, hostname=None, username=None,
-              password=None, port=None, database='valentin', table='GeneWAys',
-              query_dict=None):
+def get_table(
+    session=None,
+    hostname=None,
+    username=None,
+    password=None,
+    port=None,
+    database="valentin",
+    table="GeneWAys",
+    query_dict=None,
+):
     """
     Parameters
     ----------
@@ -92,33 +98,33 @@ def get_table(session=None, hostname=None, username=None,
     """
     session_dict = get_session_info(session)
     if hostname:
-        session_dict['host'] = hostname
+        session_dict["host"] = hostname
     if username:
-        session_dict['user'] = username
+        session_dict["user"] = username
     if password:
-        session_dict['passwd'] = password
+        session_dict["passwd"] = password
     if port:
-        session_dict['port'] = port
+        session_dict["port"] = port
 
-    session_dict['db'] = database
+    session_dict["db"] = database
 
-    if query_dict and 'columns' in query_dict.keys():
-        cols = ', '.join(map(lambda x: str(x), query_dict['columns']))
+    if query_dict and "columns" in query_dict.keys():
+        cols = ", ".join(map(lambda x: str(x), query_dict["columns"]))
     else:
-        cols = '*'
+        cols = "*"
 
-    query = 'select ' + cols + ' from ' + table
-    if query_dict and 'mask' in query_dict.keys():
-        cs = ' where '
-        for k in query_dict['mask'].keys():
-            cs += k + ' in (%s)'
-            ids = ', '.join(map(lambda x: str(x), query_dict['mask'][k]))
+    query = "select " + cols + " from " + table
+    if query_dict and "mask" in query_dict.keys():
+        cs = " where "
+        for k in query_dict["mask"].keys():
+            cs += k + " in (%s)"
+            ids = ", ".join(map(lambda x: str(x), query_dict["mask"][k]))
             cs %= ids
         query += cs
 
-    if 'nrows' in query_dict.keys():
-        query += ' limit ' + str(query_dict['nrows'])
-    query += ';'
+    if "nrows" in query_dict.keys():
+        query += " limit " + str(query_dict["nrows"])
+    query += ";"
 
     conn = connect(**session_dict)
     df = read_sql(query, con=conn)
@@ -127,14 +133,14 @@ def get_table(session=None, hostname=None, username=None,
 
 
 def get_pmids_features(list_pmids):
-    iss = 'issn'
-    ye = 'year'
-    pm = 'pmid'
+    iss = "issn"
+    ye = "year"
+    pm = "pmid"
 
     # create the query dict
-    qq = {'columns': [pm, iss, ye], 'mask': {pm: []}}
+    qq = {"columns": [pm, iss, ye], "mask": {pm: []}}
 
-    qq['mask'][pm] = list_pmids
-    qq['columns'] = [pm, ye, iss]
-    df = get_table('a', database='medline', table='doc', query_dict=qq)
+    qq["mask"][pm] = list_pmids
+    qq["columns"] = [pm, ye, iss]
+    df = get_table("a", database="medline", table="doc", query_dict=qq)
     return df

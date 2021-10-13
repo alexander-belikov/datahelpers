@@ -16,8 +16,10 @@ def apply_map_ab(map_ab, sublist):
             b = map_ab[a].pop()
             sub.append(b)
         else:
-            raise ValueError('a to b multivalued function '
-                             'and partition list of a\'s are misaligned')
+            raise ValueError(
+                "a to b multivalued function "
+                "and partition list of a's are misaligned"
+            )
     return sub
 
 

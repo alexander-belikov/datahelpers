@@ -3,11 +3,11 @@ import argparse
 
 
 def cut_string(x):
-    if '_' in x:
-        x2 = x.split('_')
-        if '|' in x:
+    if "_" in x:
+        x2 = x.split("_")
+        if "|" in x:
             # if we need hgnc ids, work with x3
-            x3 = x2[0].split('|')
+            x3 = x2[0].split("|")
             r = x2[1:]
         else:
             r = x2[1:]
@@ -50,17 +50,22 @@ def drop_duplicates_cols_arrange_col(dft, columns, col):
     # drop rows with col == 'NULL'
     # drop (ni, pm) duplicates
     # only max value of col remain from duplicates
-    maskt = (dft[col] == 'NULL')
-    print('fraction of claims with missing {0} '
-          'dropped: {1:.4f}'.format(col, float(sum(maskt)) / maskt.shape[0]))
+    maskt = dft[col] == "NULL"
+    print(
+        "fraction of claims with missing {0} "
+        "dropped: {1:.4f}".format(col, float(sum(maskt)) / maskt.shape[0])
+    )
     df2 = dft.loc[~maskt].copy()
     df2[col] = df2[col].astype(float)
     df2 = df2.reset_index(drop=True)
     idx = df2.groupby(columns)[col].idxmax()
     df3 = df2.loc[idx]
     # df3 = df3.drop_duplicates(columns)
-    print('fraction of claims (same pmid extractions) dropped: {0:.4f}'.format(1. -
-                                                                               float(df3.shape[0]) / df2.shape[0]))
+    print(
+        "fraction of claims (same pmid extractions) dropped: {0:.4f}".format(
+            1.0 - float(df3.shape[0]) / df2.shape[0]
+        )
+    )
     return df3
 
 
@@ -70,4 +75,4 @@ def str2bool(v):
     if v.lower() in ("no", "false", "f", "n" "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
+        raise argparse.ArgumentTypeError("Boolean value expected.")

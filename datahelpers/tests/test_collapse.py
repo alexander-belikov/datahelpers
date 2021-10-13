@@ -1,6 +1,10 @@
-from ..collapse import collapse_series_simple, \
-    collapse_strings, convert_NAs_Series, \
-    convert_NAs_DataFrame, aggregate_negatives_boolean_style
+from ..collapse import (
+    collapse_series_simple,
+    collapse_strings,
+    convert_NAs_Series,
+    convert_NAs_DataFrame,
+    aggregate_negatives_boolean_style,
+)
 from pandas import Series, DataFrame, concat
 import numpy as np
 from numpy import random as rn
@@ -10,24 +14,24 @@ import unittest
 class TestCollapse(unittest.TestCase):
 
     N = 60
-    strings = ['a', 'aa', 'ab', 'ac', 'aaa', 'bbb', 'kkk']
-    strings_NAs = ['a', 'NULL', 'ab', 'NAN', 'aaa', 'bbb', 'nan']
+    strings = ["a", "aa", "ab", "ac", "aaa", "bbb", "kkk"]
+    strings_NAs = ["a", "NULL", "ab", "NAN", "aaa", "bbb", "nan"]
 
-    inds = rn.randint(0, len(strings)-2, N)
+    inds = rn.randint(0, len(strings) - 2, N)
     inds2 = rn.randint(0, len(strings), N)
     data = [strings[j] for j in inds]
     data2 = [strings[j] for j in inds2]
     data3 = np.array([strings_NAs, strings_NAs[::-1]])
 
-    c1, c2 = 'c1', 'c2'
+    c1, c2 = "c1", "c2"
     index_cols = [c1, c2]
 
     N2 = 10
-    at = 'action'
-    st = 'claim'
+    at = "action"
+    st = "claim"
     cols_total = [c1, c2, at, st]
-    keys = ['a', 'b']
-    vals = [[True, True], [True, False], [False, True],  [False, False]]
+    keys = ["a", "b"]
+    vals = [[True, True], [True, False], [False, True], [False, False]]
     s = np.array(keys)
 
     index_c = np.tile(s, (N2, 1))
@@ -74,5 +78,6 @@ class TestCollapse(unittest.TestCase):
     def test_aggregate_negatives_boolean_style(self):
         aggregate_negatives_boolean_style(self.df, self.index_cols, self.at, self.st)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

@@ -37,7 +37,7 @@ def convert_NAs_DataFrame(obj, working_columns=[], dropNAs=True):
             # TODO clean inplace redundancy, see pandas
             obj[c] = convert_NAs_Series(obj[c])
         if dropNAs:
-            obj = obj.dropna(axis=0, how='any', subset=cols)
+            obj = obj.dropna(axis=0, how="any", subset=cols)
         return obj
 
 
@@ -62,9 +62,9 @@ def convert_to_bool(df, working_columns=[], inplace=False):
         if len(dft[c].unique()) < 3:
             # perhaps something more sophisticated could be
             # implemented
-            dft[c] = dft[c].replace({'Y': True, 'N': False,
-                                     '1': True, '0': False,
-                                     1: True, 0: False})
+            dft[c] = dft[c].replace(
+                {"Y": True, "N": False, "1": True, "0": False, 1: True, 0: False}
+            )
     return dft
 
 
@@ -88,7 +88,7 @@ def convert_to_numeric(df, working_columns=[], inplace=False):
     cols = list(set(working_columns) & set(df.columns))
 
     for c in cols:
-        dft[c] = to_numeric(dft[c], errors='ignore')
+        dft[c] = to_numeric(dft[c], errors="ignore")
         try:
             s = dft[c].astype(int)
             if s == dft[c]:
@@ -98,8 +98,14 @@ def convert_to_numeric(df, working_columns=[], inplace=False):
     return dft
 
 
-def collapse_df(df, str_dicts=None, dropna_columns=[], bool_columns=[],
-                numeric_columns=[], object_columns=[]):
+def collapse_df(
+    df,
+    str_dicts=None,
+    dropna_columns=[],
+    bool_columns=[],
+    numeric_columns=[],
+    object_columns=[],
+):
     """
     collapses DataFrame types column by column
     :param df: DataFrame
@@ -129,8 +135,8 @@ def collapse_series_sort(s):
     univals = s2.unique()
     dd = {k: univals[k] for k in np.arange(univals.shape[0])}
     dft = DataFrame(s2)
-    dft['mask'] = (s2 != s2.shift())
-    narr = dft['mask'].values
+    dft["mask"] = s2 != s2.shift()
+    narr = dft["mask"].values
     narr2 = np.ndarray(shape=(narr.shape[0]), dtype=int)
     it = 0
     narr[0] = 1
@@ -138,9 +144,9 @@ def collapse_series_sort(s):
         if narr[k] and k > 0:
             it += 1
         narr2[k] = it
-    dft['coded'] = narr2
+    dft["coded"] = narr2
     dft.sort_index(inplace=True)
-    return dft['coded'], dd
+    return dft["coded"], dd
 
 
 def collapse_series_simple2(s, ddinv=None, apply_on_series=True):
@@ -160,9 +166,10 @@ def collapse_series_simple2(s, ddinv=None, apply_on_series=True):
     if ddinv:
         list_extra = list(set(ll) - set(ddinv.values()))
         if list_extra:
-            int_max = max(ddinv.keys())+1
-            dd_extra = {(k+int_max): list_extra[k] for k in
-                        np.arange(len(list_extra))}
+            int_max = max(ddinv.keys()) + 1
+            dd_extra = {
+                (k + int_max): list_extra[k] for k in np.arange(len(list_extra))
+            }
             ddinv.update(dd_extra)
         dd = {ddinv[k]: k for k in ddinv.keys()}
 
@@ -206,8 +213,7 @@ def create_renaming_dict(obj_list, existing_dict=None):
         list_extra = sorted(list(set(obj_list) - set(existing_dict.keys())))
         if list_extra:
             int_max = max(existing_dict.values()) + 1
-            dd = {list_extra[k]: (k+int_max) for k in
-                  np.arange(len(list_extra))}
+            dd = {list_extra[k]: (k + int_max) for k in np.arange(len(list_extra))}
             dd.update(existing_dict)
         else:
             dd = existing_dict
@@ -215,11 +221,13 @@ def create_renaming_dict(obj_list, existing_dict=None):
         dd = {obj_list[k]: k for k in np.arange(len(obj_list))}
     return dd
 
+
 collapse = collapse_series_simple
 
 
-def collapse_strings(df_orig, str_dicts=None, working_columns=[],
-                     n=None, verbose=False):
+def collapse_strings(
+    df_orig, str_dicts=None, working_columns=[], n=None, verbose=False
+):
     """
     encode DataFrame's constituent Series of objects into a Series of ints
     and provide the encoding dict of dicts
@@ -243,13 +251,13 @@ def collapse_strings(df_orig, str_dicts=None, working_columns=[],
 
     if isinstance(df, DataFrame):
         for c in cols:
-            if df[c].dtype == np.dtype('O'):
+            if df[c].dtype == np.dtype("O"):
                 try:
                     df[c] = df[c].astype(str)
                 except UnicodeEncodeError:
-                    df[c] = df[c].astype('unicode')
+                    df[c] = df[c].astype("unicode")
                 if verbose:
-                    print('process column', c)
+                    print("process column", c)
                 if c not in str_dicts.keys():
                     str_dicts[c] = None
                 df[c], str_dicts[c] = collapse(df[c], str_dicts[c])
@@ -273,14 +281,16 @@ def regexp_reduce_yield_agg_dict(df, columns):
         keys_prime_set = set(keys_prime)
         keys_trans = set(uni_vals) - keys_prime_set
         regexp_dict = {k: chain_regexp_transforms(k) for k in keys_trans}
-    # mask of such entries that are regexp transformed
+        # mask of such entries that are regexp transformed
         m = df[c].isin(keys_trans)
         df.loc[m, c] = df.loc[m, c].apply(lambda x: regexp_dict[x])
         agg_encoding_set |= keys_prime_set
         agg_regexp_dict.update(regexp_dict)
 
     agg_encoding_list = sorted(set(agg_encoding_set))
-    agg_encoding_dict = {agg_encoding_list[k]: k for k in np.arange(len(agg_encoding_list))}
+    agg_encoding_dict = {
+        agg_encoding_list[k]: k for k in np.arange(len(agg_encoding_list))
+    }
     return df, agg_encoding_dict, agg_regexp_dict
 
 
@@ -356,15 +366,19 @@ def aggregate_negatives_boolean_style(dfi, index_cols, at, st):
     """
     full_index = index_cols + [at]
     dfw = dfi.reset_index()
-    dfw_mod = dfw.groupby(index_cols).apply(lambda x: float(x[at].sum())/x[at].shape[0] < 0.5).reset_index()
+    dfw_mod = (
+        dfw.groupby(index_cols)
+        .apply(lambda x: float(x[at].sum()) / x[at].shape[0] < 0.5)
+        .reset_index()
+    )
     dfw_mod.rename(columns={0: at}, inplace=True)
-    dfw_mod['flag'] = True
+    dfw_mod["flag"] = True
 
     # TODO : publish bug pd.DataFrame.merge does not keep the original index
-    mask = dfw[full_index].merge(dfw_mod, how='left', on=full_index)
+    mask = dfw[full_index].merge(dfw_mod, how="left", on=full_index)
 
-    mask.loc[mask['flag'].isnull(), 'flag'] = False
-    m = mask['flag']
+    mask.loc[mask["flag"].isnull(), "flag"] = False
+    m = mask["flag"]
     # print 'number of rows to be transformed', sum(mask_neg_dups_at)
     dfw.loc[m, [at, st]] = ~dfw.loc[m, [at, st]]
     return dfw
