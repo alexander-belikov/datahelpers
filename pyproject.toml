@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "datahelpers"
-version = "0.2.0"
+version = "1.0"
 description = "data transformations"
 authors = ["Alexander Belikov <abelikov@gmail.com>"]
 readme = "README.md"
