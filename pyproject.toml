@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "datahelpers"
-version = "1.0"
-description = "Data transformations."
+version = "1.0.1"
+description = "Data transformations"
 authors = [
     "Alexander Belikov <abelikov@gmail.com>"
 ]
