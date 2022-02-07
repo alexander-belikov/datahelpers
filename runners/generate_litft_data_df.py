@@ -13,7 +13,7 @@ import gzip
 version = 8
 
 df = pd.read_csv(
-    expanduser("/Users/belikov/data/literome/literome_fulltext_claims.csv.gz"),
+    expanduser("~/data/literome/literome_fulltext_claims.csv.gz"),
     sep=",",
     compression="gzip",
 )
