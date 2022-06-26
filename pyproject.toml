@@ -6,9 +6,7 @@ authors = [
     "Alexander Belikov <abelikov@gmail.com>"
 ]
 license = "MIT"
-packages = [
-    { include = "datahelpers/__init__.py" },
-]
+packages = [{ include = "datahelpers" }]
 
 [tool.poetry.dependencies]
 python = "^3.7"
