@@ -11,16 +11,15 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "~3.7.1"
-numpy = "1.17.4"
-pandas = "1.0.3"
+python = "^3.7"
 PyMySQL = "^1.0.2"
 igraph = "^0.9.8"
 pathos = "^0.2.8"
-seaborn = "0.9.0"
 PyWavelets = "^1.1.1"
-jupyter = "^1.0.0"
 tabulate = "^0.8.9"
+pip = "^22.1.2"
+pandas = "1.0.3"
+seaborn = "^0.11.2"
 
 
 [build-system]
